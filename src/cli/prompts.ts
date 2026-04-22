@@ -45,32 +45,32 @@ export type TargetSelection = {
   scope: Scope
 }
 
-// Build grouped checkbox options; auto-detect installed tools and put them first
+// Build grouped checkbox options — only shows installed tools, nothing pre-checked
 export async function promptTargets(targets: Target[]): Promise<TargetSelection[]> {
-  // Group by company
-  const companies = [...new Set(targets.map((t) => t.company))]
+  const installedTargets = targets.filter((t) => t.detect())
 
+  if (installedTargets.length === 0) {
+    throw new Error('No supported tools detected on this machine.')
+  }
+
+  const companies = [...new Set(installedTargets.map((t) => t.company))]
   const choices: Array<{ name: string; value: string; checked: boolean }> = []
 
   for (const company of companies) {
-    const companyTargets = targets.filter((t) => t.company === company)
+    const companyTargets = installedTargets.filter((t) => t.company === company)
     for (const target of companyTargets) {
-      const detected = target.detect()
       for (const scope of target.scopes) {
-        const label =
-          `${target.name} ${scope === 'user' ? '(global)' : '(this project)'}` +
-          (detected ? '' : c.dim(' [not detected]'))
         choices.push({
-          name: label,
+          name: `${target.name} ${scope === 'user' ? '(global)' : '(this project)'}`,
           value: `${target.id}:${scope}`,
-          checked: detected,
+          checked: false,
         })
       }
     }
   }
 
   const selected = await checkbox({
-    message: 'Select targets to install into',
+    message: `Select targets to install into ${c.dim(`(${choices.length} tools detected)`)}`,
     choices,
     pageSize: 20,
   })
