@@ -1,0 +1,54 @@
+{
+  "": {
+    "swift-dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/master.swiftdeps"
+  },
+  "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/App.swift": {
+    "dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/App.d",
+    "object": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/App.swift.o",
+    "swiftmodule": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/App~partial.swiftmodule",
+    "swift-dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/App.swiftdeps",
+    "diagnostics": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/App.dia"
+  },
+  "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/ConfigReader.swift": {
+    "dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ConfigReader.d",
+    "object": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ConfigReader.swift.o",
+    "swiftmodule": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ConfigReader~partial.swiftmodule",
+    "swift-dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ConfigReader.swiftdeps",
+    "diagnostics": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ConfigReader.dia"
+  },
+  "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/Models.swift": {
+    "dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/Models.d",
+    "object": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/Models.swift.o",
+    "swiftmodule": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/Models~partial.swiftmodule",
+    "swift-dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/Models.swiftdeps",
+    "diagnostics": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/Models.dia"
+  },
+  "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/ServerStore.swift": {
+    "dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ServerStore.d",
+    "object": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ServerStore.swift.o",
+    "swiftmodule": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ServerStore~partial.swiftmodule",
+    "swift-dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ServerStore.swiftdeps",
+    "diagnostics": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ServerStore.dia"
+  },
+  "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/Views/ByToolView.swift": {
+    "dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ByToolView.d",
+    "object": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ByToolView.swift.o",
+    "swiftmodule": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ByToolView~partial.swiftmodule",
+    "swift-dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ByToolView.swiftdeps",
+    "diagnostics": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ByToolView.dia"
+  },
+  "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/Views/ContentView.swift": {
+    "dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ContentView.d",
+    "object": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ContentView.swift.o",
+    "swiftmodule": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ContentView~partial.swiftmodule",
+    "swift-dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ContentView.swiftdeps",
+    "diagnostics": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ContentView.dia"
+  },
+  "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/Views/CoverageView.swift": {
+    "dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/CoverageView.d",
+    "object": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/CoverageView.swift.o",
+    "swiftmodule": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/CoverageView~partial.swiftmodule",
+    "swift-dependencies": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/CoverageView.swiftdeps",
+    "diagnostics": "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/CoverageView.dia"
+  }
+}

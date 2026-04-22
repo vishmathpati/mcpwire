@@ -1,0 +1,40 @@
+import Foundation
+import Combine
+
+// MARK: - Observable store (drives all views)
+
+@MainActor
+final class ServerStore: ObservableObject {
+    @Published var tools:     [ToolSummary] = []
+    @Published var isLoading: Bool          = false
+
+    // Only detected tools, in display order
+    var detectedTools: [ToolSummary] { tools.filter { $0.detected } }
+
+    // Unique server names across all detected tools
+    var allServerNames: [String] {
+        let detected = detectedTools
+        return Array(Set(detected.flatMap { $0.servers.map { $0.name } }))
+            .sorted { a, b in
+                let ac = detected.filter { t in t.servers.contains { $0.name == a } }.count
+                let bc = detected.filter { t in t.servers.contains { $0.name == b } }.count
+                if ac != bc { return ac > bc }
+                return a.lowercased() < b.lowercased()
+            }
+    }
+
+    // Total unique servers across all detected tools
+    var serverCount: Int { allServerNames.count }
+
+    func refresh() {
+        guard !isLoading else { return }
+        isLoading = true
+        Task.detached(priority: .userInitiated) {
+            let result = ConfigReader.shared.readAllTools()
+            await MainActor.run {
+                self.tools     = result
+                self.isLoading = false
+            }
+        }
+    }
+}

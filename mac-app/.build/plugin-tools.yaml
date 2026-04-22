@@ -1,0 +1,81 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "MCPBoltBar-arm64-apple-macosx26.0-debug.exe": ["<MCPBoltBar-arm64-apple-macosx26.0-debug.exe>"]
+  "MCPBoltBar-arm64-apple-macosx26.0-debug.module": ["<MCPBoltBar-arm64-apple-macosx26.0-debug.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<MCPBoltBar-arm64-apple-macosx26.0-debug.exe>","<MCPBoltBar-arm64-apple-macosx26.0-debug.module>"]
+  "test": ["<MCPBoltBar-arm64-apple-macosx26.0-debug.exe>","<MCPBoltBar-arm64-apple-macosx26.0-debug.module>"]
+default: "main"
+nodes:
+  "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar":
+    is-mutated: true
+commands:
+  "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar-entitlement.plist"]
+    description: "Write auxiliary file /Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar-entitlement.plist"
+
+  "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/App.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/ConfigReader.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/Models.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/ServerStore.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/Views/ByToolView.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/Views/ContentView.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/Views/CoverageView.swift"]
+    outputs: ["/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/sources"]
+    description: "Write auxiliary file /Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/sources"
+
+  "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/App.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ByToolView.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ConfigReader.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ContentView.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/CoverageView.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/Models.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ServerStore.swift.o"]
+    outputs: ["/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.product/Objects.LinkFileList"
+
+  "/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Library/Developer/CommandLineTools/usr/bin/swiftc"]
+    outputs: ["/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt"
+
+  "<MCPBoltBar-arm64-apple-macosx26.0-debug.exe>":
+    tool: phony
+    inputs: ["<MCPBoltBar-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    outputs: ["<MCPBoltBar-arm64-apple-macosx26.0-debug.exe>"]
+
+  "<MCPBoltBar-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/App.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ConfigReader.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/Models.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ServerStore.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ByToolView.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ContentView.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/CoverageView.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/Modules/MCPBoltBar.swiftmodule"]
+    outputs: ["<MCPBoltBar-arm64-apple-macosx26.0-debug.module>"]
+
+  "C.MCPBoltBar-arm64-apple-macosx26.0-debug.exe":
+    tool: shell
+    inputs: ["/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/App.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ByToolView.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ConfigReader.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ContentView.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/CoverageView.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/Models.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ServerStore.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.product/Objects.LinkFileList"]
+    outputs: ["/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/MCPBoltBar"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-L","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug","-o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar","-module-name","MCPBoltBar","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_MCPBoltBar_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.product/Objects.LinkFileList","-target","arm64-apple-macosx14.0","-Xlinker","-add_ast_path","-Xlinker","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/Modules/MCPBoltBar.swiftmodule","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g"]
+
+  "C.MCPBoltBar-arm64-apple-macosx26.0-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar-entitlement.plist"]
+    outputs: ["<MCPBoltBar-arm64-apple-macosx26.0-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/MCPBoltBar"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar-entitlement.plist","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar"]
+
+  "C.MCPBoltBar-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/App.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/ConfigReader.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/Models.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/ServerStore.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/Views/ByToolView.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/Views/ContentView.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/Views/CoverageView.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/swift-version--1AB21518FC5DEDBE.txt","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/sources"]
+    outputs: ["/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/App.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ConfigReader.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/Models.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ServerStore.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ByToolView.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/ContentView.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/CoverageView.swift.o","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/Modules/MCPBoltBar.swiftmodule"]
+    description: "Compiling Swift Module 'MCPBoltBar' (7 sources)"
+    args: ["/Library/Developer/CommandLineTools/usr/bin/swiftc","-module-name","MCPBoltBar","-emit-dependencies","-emit-module","-emit-module-path","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/Modules/MCPBoltBar.swiftmodule","-output-file-map","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/output-file-map.json","-incremental","-c","@/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/MCPBoltBar.build/sources","-I","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx14.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j10","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","MCPBoltBar_main","-swift-version","5","-I","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-L","/Library/Developer/CommandLineTools/Library/Developer/Frameworks","-plugin-path","/Library/Developer/CommandLineTools/usr/lib/swift/host/plugins/testing","-sdk","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-g","-Xcc","-isysroot","-Xcc","/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk","-Xcc","-fPIC","-Xcc","-g","-package-name","mac_app"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Sources/MCPBoltBar/","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Package.swift","/Users/vishmathpati/Arel OS/Projects/active/mcp/mac-app/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+
