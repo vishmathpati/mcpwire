@@ -1,10 +1,10 @@
 {
-  "name": "@vishmathpati/mcp-wire",
+  "name": "mcpbolt",
   "version": "0.1.0",
   "description": "Wire MCP servers into any AI coding tool from one paste",
   "type": "module",
   "bin": {
-    "mcp-wire": "dist/cli/index.js"
+    "mcpbolt": "dist/cli/index.js"
   },
   "files": [
     "dist/cli/index.js"
