@@ -1,10 +1,36 @@
 import AppKit
 import Foundation
+import ServiceManagement
 
 // MARK: - Central place for app-level actions (menu + right-click + buttons)
 
 @MainActor
 enum AppActions {
+
+    // MARK: - Launch at login (macOS 13+, SMAppService)
+
+    static var launchAtLoginEnabled: Bool {
+        get { SMAppService.mainApp.status == .enabled }
+        set {
+            do {
+                if newValue {
+                    if SMAppService.mainApp.status == .enabled { return }
+                    try SMAppService.mainApp.register()
+                } else {
+                    if SMAppService.mainApp.status != .enabled { return }
+                    try SMAppService.mainApp.unregister()
+                }
+            } catch {
+                let alert = NSAlert()
+                alert.messageText = newValue ? "Couldn't enable launch at login" : "Couldn't disable launch at login"
+                alert.informativeText = error.localizedDescription
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "OK")
+                NSApp.activate(ignoringOtherApps: true)
+                alert.runModal()
+            }
+        }
+    }
 
     // MARK: - Version + URLs
 

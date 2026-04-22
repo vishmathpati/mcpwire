@@ -17,11 +17,52 @@ struct ToolSpec {
     let kind: ConfigKind
 }
 
-enum ToolSpecs {
-    static func spec(for toolID: String) -> ToolSpec? {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let cwd  = FileManager.default.currentDirectoryPath
+/// Scope for a tool config. User = global (home directory); Project = per-project
+/// file inside a picked folder. Not every tool has a project scope — those
+/// return nil from `spec(for:scope:projectRoot:)` when scope is .project.
+enum ConfigScope: String {
+    case user
+    case project
+}
 
+enum ToolSpecs {
+    /// Default: user scope (what the existing call sites get).
+    static func spec(for toolID: String) -> ToolSpec? {
+        spec(for: toolID, scope: .user, projectRoot: nil)
+    }
+
+    /// Project-scope variants are currently defined only for tools that
+    /// officially support a per-project MCP config file.
+    static func spec(for toolID: String, scope: ConfigScope, projectRoot: String?) -> ToolSpec? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+
+        // Project-scoped specs (only a subset of tools support this).
+        if scope == .project {
+            guard let root = projectRoot else { return nil }
+            switch toolID {
+            case "cursor":
+                return .init(id: toolID,
+                             path: "\(root)/.cursor/mcp.json",
+                             kind: .json(key: "mcpServers"))
+            case "vscode":
+                return .init(id: toolID,
+                             path: "\(root)/.vscode/mcp.json",
+                             kind: .json(key: "servers"))
+            case "roo":
+                return .init(id: toolID,
+                             path: "\(root)/.roo/mcp.json",
+                             kind: .json(key: "mcpServers"))
+            case "claude-code":
+                // Claude Code respects .mcp.json in the project root.
+                return .init(id: toolID,
+                             path: "\(root)/.mcp.json",
+                             kind: .json(key: "mcpServers"))
+            default:
+                return nil
+            }
+        }
+
+        // User scope (default path for every tool).
         switch toolID {
         case "claude-desktop":
             return .init(id: toolID,
@@ -49,7 +90,7 @@ enum ToolSpecs {
                          kind: .json(key: "mcpServers"))
         case "roo":
             return .init(id: toolID,
-                         path: "\(cwd)/.roo/mcp.json",
+                         path: "\(home)/.roo/mcp.json",
                          kind: .json(key: "mcpServers"))
         case "zed":
             return .init(id: toolID,
@@ -64,9 +105,9 @@ enum ToolSpecs {
                          path: "\(home)/.continue/config.yaml",
                          kind: .yaml)
         case "opencode":
-            // Note: opencode uses a slightly different per-server shape
+            // opencode uses a slightly different per-server shape
             // ({ type: "local"|"remote", command: [...] }) than Claude Desktop.
-            // Users should paste opencode-shape configs when targeting opencode.
+            // ConfigWriter translates at I/O boundaries.
             return .init(id: toolID,
                          path: "\(home)/.config/opencode/opencode.json",
                          kind: .json(key: "mcp"))
@@ -78,6 +119,9 @@ enum ToolSpecs {
             return nil
         }
     }
+
+    /// Tool IDs that support project scope.
+    static let projectScopedTools: Set<String> = ["cursor", "vscode", "roo", "claude-code"]
 }
 
 enum ConfigWriter {
@@ -105,24 +149,175 @@ enum ConfigWriter {
         }
     }
 
-    /// Writes one server into the tool's config. Throws on failure.
+    /// Writes one server into the tool's config (user scope). Throws on failure.
     static func writeServer(
         toolID: String,
         name: String,
         config: [String: Any]
     ) throws {
-        guard let spec = ToolSpecs.spec(for: toolID) else {
-            throw WriteError.unsupportedFormat(toolID)
+        try writeServer(toolID: toolID, scope: .user, projectRoot: nil, name: name, config: config)
+    }
+
+    /// Scope-aware write. Use `scope: .project` with a `projectRoot` to land
+    /// the server in `<projectRoot>/.cursor/mcp.json` (or equivalent).
+    /// `config` is in claude-shape ({ command, args, env, ... } or { url, headers, ... }).
+    /// We translate to opencode-shape at write time if the target is opencode.
+    static func writeServer(
+        toolID: String,
+        scope: ConfigScope,
+        projectRoot: String?,
+        name: String,
+        config: [String: Any]
+    ) throws {
+        guard let spec = ToolSpecs.spec(for: toolID, scope: scope, projectRoot: projectRoot) else {
+            throw WriteError.unsupportedFormat(scope == .project ? "\(toolID) (project scope)" : toolID)
         }
+
+        let shaped: [String: Any] = (toolID == "opencode")
+            ? claudeShapeToOpencode(config)
+            : config
 
         switch spec.kind {
         case .json(let key):
-            try writeJson(path: spec.path, key: key, name: name, config: config)
+            try writeJson(path: spec.path, key: key, name: name, config: shaped)
         case .jsonNested(let keys):
-            try writeJsonNested(path: spec.path, keys: keys, name: name, config: config)
+            try writeJsonNested(path: spec.path, keys: keys, name: name, config: shaped)
         case .toml, .yaml:
             throw WriteError.unsupportedFormat(toolID)
         }
+    }
+
+    /// Returns the target file path we'd write to for a given tool + scope.
+    /// Useful for the diff preview.
+    static func previewPath(toolID: String, scope: ConfigScope, projectRoot: String?) -> String? {
+        ToolSpecs.spec(for: toolID, scope: scope, projectRoot: projectRoot)?.path
+    }
+
+    /// Builds what the file contents WOULD be if we wrote this server now.
+    /// Returns (beforeText, afterText). Used for diff preview.
+    static func previewWrite(
+        toolID: String,
+        scope: ConfigScope,
+        projectRoot: String?,
+        name: String,
+        config: [String: Any]
+    ) -> (before: String, after: String)? {
+        guard let spec = ToolSpecs.spec(for: toolID, scope: scope, projectRoot: projectRoot) else { return nil }
+
+        // Before: what's currently on disk (raw).
+        let before: String = {
+            guard FileManager.default.fileExists(atPath: spec.path),
+                  let raw = try? String(contentsOfFile: spec.path, encoding: .utf8)
+            else { return "" }
+            return raw
+        }()
+
+        let shaped: [String: Any] = (toolID == "opencode")
+            ? claudeShapeToOpencode(config)
+            : config
+
+        // After: simulated root with the new server applied.
+        var root = loadJsonRoot(path: spec.path)
+        switch spec.kind {
+        case .json(let key):
+            var dict = root[key] as? [String: Any] ?? [:]
+            dict[name] = shaped
+            root[key] = dict
+        case .jsonNested(let keys):
+            var chain: [[String: Any]] = [root]
+            for k in keys {
+                let current = chain.last!
+                chain.append(current[k] as? [String: Any] ?? [:])
+            }
+            var innermost = chain.removeLast()
+            innermost[name] = shaped
+            var up = innermost
+            for k in keys.reversed() {
+                var parent = chain.removeLast()
+                parent[k] = up
+                up = parent
+            }
+            root = up
+        case .toml, .yaml:
+            return (before, "(TOML / YAML preview not supported)")
+        }
+
+        let data = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted])
+        let after = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        return (before, after)
+    }
+
+    /// Reads one server's full config from a tool's file, returned in claude-shape.
+    /// Returns nil if the tool's format is unsupported or the server isn't there.
+    static func readServer(toolID: String, name: String) -> [String: Any]? {
+        guard let spec = ToolSpecs.spec(for: toolID) else { return nil }
+
+        let root: [String: Any]
+        let raw: [String: Any]?
+
+        switch spec.kind {
+        case .json(let key):
+            root = loadJsonRoot(path: spec.path)
+            raw  = (root[key] as? [String: Any])?[name] as? [String: Any]
+
+        case .jsonNested(let keys):
+            var cursor: [String: Any] = loadJsonRoot(path: spec.path)
+            for k in keys {
+                cursor = (cursor[k] as? [String: Any]) ?? [:]
+            }
+            raw = cursor[name] as? [String: Any]
+
+        case .toml, .yaml:
+            return nil
+        }
+
+        guard var entry = raw else { return nil }
+
+        if toolID == "opencode" {
+            entry = opencodeShapeToClaude(entry)
+        }
+        return entry
+    }
+
+    // MARK: - Opencode shape translation
+
+    /// Claude-shape: { command: "npx", args: ["-y", "pkg"], env: {...} }
+    ///             OR { url: "...", headers: {...} }
+    /// Opencode: { type: "local", command: ["npx", "-y", "pkg"], environment: {...} }
+    ///         OR { type: "remote", url: "...", headers: {...} }
+    static func claudeShapeToOpencode(_ c: [String: Any]) -> [String: Any] {
+        if let url = c["url"] as? String {
+            var out: [String: Any] = ["type": "remote", "url": url]
+            if let h = c["headers"] as? [String: Any], !h.isEmpty { out["headers"] = h }
+            return out
+        }
+        var cmd: [String] = []
+        if let command = c["command"] as? String, !command.isEmpty { cmd.append(command) }
+        if let args = c["args"] as? [String] { cmd.append(contentsOf: args) }
+        var out: [String: Any] = ["type": "local", "command": cmd]
+        if let env = c["env"] as? [String: Any], !env.isEmpty { out["environment"] = env }
+        return out
+    }
+
+    static func opencodeShapeToClaude(_ c: [String: Any]) -> [String: Any] {
+        let type = c["type"] as? String ?? "local"
+        if type == "remote" {
+            var out: [String: Any] = [:]
+            if let url = c["url"] as? String { out["url"] = url }
+            if let h = c["headers"] as? [String: Any], !h.isEmpty { out["headers"] = h }
+            return out
+        }
+        var command = ""
+        var args: [String] = []
+        if let parts = c["command"] as? [String] {
+            command = parts.first ?? ""
+            args    = Array(parts.dropFirst())
+        } else if let s = c["command"] as? String {
+            command = s
+        }
+        var out: [String: Any] = ["command": command, "args": args]
+        if let env = c["environment"] as? [String: Any], !env.isEmpty { out["env"] = env }
+        return out
     }
 
     /// Merges env values into an existing server's config, writing back.
@@ -340,14 +535,23 @@ enum ConfigWriter {
         return obj
     }
 
-    private static func backupAndWrite(path: String, root: [String: Any]) throws {
-        let fm  = FileManager.default
-        let bak = path + ".bak"
+    // Keep the most recent N backups per config file.
+    private static let maxBackupsPerFile = 3
 
-        // Backup
+    private static func backupAndWrite(path: String, root: [String: Any]) throws {
+        let fm = FileManager.default
+
+        // Timestamped backup: <path>.bak.<yyyyMMddHHmmssSSS>
         if fm.fileExists(atPath: path) {
-            if fm.fileExists(atPath: bak) { try? fm.removeItem(atPath: bak) }
+            let stamp = backupStamp()
+            let bak = "\(path).bak.\(stamp)"
             try? fm.copyItem(atPath: path, toPath: bak)
+            pruneBackups(forPath: path)
+
+            // Also clean up the legacy single ".bak" from older app versions
+            // so it doesn't sit around indefinitely with stale keys.
+            let legacy = path + ".bak"
+            if fm.fileExists(atPath: legacy) { try? fm.removeItem(atPath: legacy) }
         }
 
         // Serialize pretty
@@ -361,10 +565,58 @@ enum ConfigWriter {
             throw WriteError.writeFailure(error.localizedDescription)
         }
 
+        // Atomic write: writes to a tmp file and renames. Either the old file
+        // or the new file is there — never a truncated partial.
         do {
-            try data.write(to: URL(fileURLWithPath: path))
+            try data.write(to: URL(fileURLWithPath: path), options: [.atomic])
         } catch {
             throw WriteError.writeFailure(error.localizedDescription)
+        }
+    }
+
+    private static func backupStamp() -> String {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyyMMddHHmmssSSS"
+        return df.string(from: Date())
+    }
+
+    /// Returns backup paths for a config, newest first.
+    static func backups(forPath path: String) -> [String] {
+        let fm  = FileManager.default
+        let url = URL(fileURLWithPath: path)
+        let dir = url.deletingLastPathComponent().path
+        let base = url.lastPathComponent + ".bak."
+
+        guard let entries = try? fm.contentsOfDirectory(atPath: dir) else { return [] }
+        let matches = entries.filter { $0.hasPrefix(base) }
+        // Timestamps sort lexically because of the yyyyMMddHHmmssSSS format.
+        return matches.sorted().reversed().map { "\(dir)/\($0)" }
+    }
+
+    private static func pruneBackups(forPath path: String) {
+        let all = backups(forPath: path)
+        guard all.count > maxBackupsPerFile else { return }
+        let fm = FileManager.default
+        for old in all.dropFirst(maxBackupsPerFile) {
+            try? fm.removeItem(atPath: old)
+        }
+    }
+
+    /// Restores the most-recent backup over the live file (used by Undo).
+    /// Returns true if a restore happened.
+    @discardableResult
+    static func restoreLatestBackup(forPath path: String) -> Bool {
+        let fm = FileManager.default
+        guard let latest = backups(forPath: path).first else { return false }
+        do {
+            if fm.fileExists(atPath: path) { try fm.removeItem(atPath: path) }
+            try fm.copyItem(atPath: latest, toPath: path)
+            // Consume the backup so Undo is a one-shot (prevents ping-pong).
+            try? fm.removeItem(atPath: latest)
+            return true
+        } catch {
+            return false
         }
     }
 

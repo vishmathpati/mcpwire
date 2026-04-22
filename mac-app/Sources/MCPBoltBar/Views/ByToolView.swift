@@ -62,67 +62,66 @@ struct ToolCard: View {
     // MARK: Card header
 
     private var cardHeader: some View {
-        Button(action: {
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
-                expanded.toggle()
-            }
-        }) {
-            HStack(spacing: 11) {
-                // Colored icon tile
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(accent.opacity(0.16))
-                        .frame(width: 36, height: 36)
-                    Image(systemName: icon)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(accent)
+        HStack(spacing: 11) {
+            Button(action: {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
+                    expanded.toggle()
                 }
+            }) {
+                HStack(spacing: 11) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(accent.opacity(0.16))
+                            .frame(width: 36, height: 36)
+                        Image(systemName: icon)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(accent)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(tool.label)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.primary)
 
-                // App name + preview
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(tool.label)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.primary)
-
-                    if expanded {
-                        Text(countLabel)
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                    } else if !filteredServers.isEmpty {
-                        let preview = filteredServers.prefix(3).map { $0.name }.joined(separator: " · ")
-                        let extra   = filteredServers.count > 3 ? " +\(filteredServers.count - 3)" : ""
-                        Text(preview + extra)
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
+                        if expanded {
+                            Text(countLabel)
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                        } else if !filteredServers.isEmpty {
+                            let preview = filteredServers.prefix(3).map { $0.name }.joined(separator: " · ")
+                            let extra   = filteredServers.count > 3 ? " +\(filteredServers.count - 3)" : ""
+                            Text(preview + extra)
+                                .font(.system(size: 11))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                    if filteredServers.count > 0 {
+                        Text("\(filteredServers.count)")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(accent)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(accent.opacity(0.14))
+                            .clipShape(Capsule())
                     }
                 }
-
-                Spacer()
-
-                // Count badge
-                if filteredServers.count > 0 {
-                    Text("\(filteredServers.count)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(accent)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(accent.opacity(0.14))
-                        .clipShape(Capsule())
-                }
-
-                // Chevron
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .rotationEffect(.degrees(expanded ? 0 : -90))
-                    .animation(.spring(response: 0.28, dampingFraction: 0.75), value: expanded)
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
-            .padding(.horizontal, 12)
-            .padding(.vertical, 11)
+            .buttonStyle(.plain)
+
+            // Tool-level menu: Restart / Undo
+            ToolCardMenu(toolID: tool.toolID, toolLabel: tool.label)
+
+            // Chevron
+            Image(systemName: "chevron.down")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.secondary)
+                .rotationEffect(.degrees(expanded ? 0 : -90))
+                .animation(.spring(response: 0.28, dampingFraction: 0.75), value: expanded)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
     }
 
     private var countLabel: String {
@@ -141,7 +140,7 @@ struct ToolCard: View {
                     .font(.system(size: 11))
                 Text(store.searchText.isEmpty
                      ? "Nothing installed yet"
-                     : "No matches for “\(store.searchText)”")
+                     : "No matches for \u{201C}\(store.searchText)\u{201D}")
                     .font(.system(size: 11))
             }
             .foregroundColor(.secondary)
@@ -162,7 +161,82 @@ struct ToolCard: View {
     }
 }
 
-// MARK: - Server row (friendly, no terminal text)
+// MARK: - Tool-level menu (Restart host app, Undo last change)
+
+struct ToolCardMenu: View {
+    let toolID: String
+    let toolLabel: String
+    @EnvironmentObject var store: ServerStore
+
+    @State private var isRestarting = false
+    @State private var resultAlert: String? = nil
+
+    var body: some View {
+        Menu {
+            let hostBundleID = AppRestart.bundleID(for: toolID)
+            if hostBundleID != nil {
+                Button {
+                    Task { await restart() }
+                } label: {
+                    Label(
+                        AppRestart.isRunning(toolID: toolID)
+                            ? "Restart \(AppRestart.displayName(for: toolID))"
+                            : "Launch \(AppRestart.displayName(for: toolID))",
+                        systemImage: "arrow.clockwise.circle"
+                    )
+                }
+            } else {
+                Text(AppRestart.manualHint(for: toolID))
+                    .foregroundColor(.secondary)
+            }
+
+            Divider()
+
+            if store.hasUndoableChange(toolID: toolID) {
+                Button {
+                    let r = store.undoLastChange(toolID: toolID)
+                    if !r.ok { resultAlert = r.error ?? "Couldn't undo." }
+                } label: {
+                    Label("Undo last change", systemImage: "arrow.uturn.backward")
+                }
+            } else {
+                Text("No recent changes to undo")
+                    .foregroundColor(.secondary)
+            }
+        } label: {
+            Image(systemName: isRestarting ? "arrow.triangle.2.circlepath" : "ellipsis")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.secondary)
+                .padding(5)
+                .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .alert("Note", isPresented: Binding(
+            get: { resultAlert != nil },
+            set: { if !$0 { resultAlert = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(resultAlert ?? "")
+        }
+    }
+
+    private func restart() async {
+        isRestarting = true
+        let r = await AppRestart.restart(toolID: toolID)
+        isRestarting = false
+        switch r {
+        case .restarted:        break
+        case .notRunning:       break
+        case .notRestartable(let hint): resultAlert = hint
+        case .failed(let msg):          resultAlert = msg
+        }
+    }
+}
+
+// MARK: - Server row (name + kind chip + health dot + ⋯ menu)
 
 struct ServerRow: View {
     let server: ServerEntry
@@ -171,11 +245,19 @@ struct ServerRow: View {
     let toolLabel: String
 
     @EnvironmentObject var store: ServerStore
+    @EnvironmentObject var overlay: OverlayPresenter
     @State private var hovering = false
     @State private var confirming = false
     @State private var errorMessage: String? = nil
     @State private var showingError = false
     @State private var removing = false
+
+    // Delete-everywhere confirm
+    @State private var confirmingEverywhere = false
+
+    // Health
+    @State private var health: HealthStatus = .unknown
+    @State private var checkingHealth = false
 
     private var kindLabel: String {
         switch server.transport {
@@ -199,20 +281,21 @@ struct ServerRow: View {
         ConfigWriter.supportsNativeWrite(toolID: toolID)
     }
 
+    private var hostCount: Int {
+        store.toolsHosting(name: server.name).count
+    }
+
     var body: some View {
         HStack(spacing: 9) {
-            // Dot
             Circle()
                 .fill(accent.opacity(0.75))
                 .frame(width: 6, height: 6)
 
-            // Name
             Text(server.name)
                 .font(.system(size: 12.5, weight: .medium))
                 .foregroundColor(.primary)
                 .lineLimit(1)
 
-            // Kind chip (Local / Remote)
             HStack(spacing: 3) {
                 Image(systemName: kindIcon)
                     .font(.system(size: 9, weight: .semibold))
@@ -225,44 +308,61 @@ struct ServerRow: View {
             .background(kindColor.opacity(0.12))
             .clipShape(Capsule())
 
+            healthDot
+
             Spacer(minLength: 0)
 
-            // Delete button (always visible, subtle)
-            Button(action: { confirming = true }) {
+            // Action menu
+            Menu {
+                Button {
+                    overlay.show(.editServer(toolID: toolID, toolLabel: toolLabel, serverName: server.name))
+                } label: {
+                    Label("Edit\u{2026}", systemImage: "pencil")
+                }
+                .disabled(!nativeSupported)
+
+                Button {
+                    overlay.show(.copyToApps(toolID: toolID, toolLabel: toolLabel, serverName: server.name))
+                } label: {
+                    Label("Copy to other apps\u{2026}", systemImage: "square.on.square")
+                }
+
+                Button {
+                    Task { await runHealthCheck() }
+                } label: {
+                    Label("Check health", systemImage: "heart.text.square")
+                }
+
+                Divider()
+
+                Button(role: .destructive) {
+                    confirming = true
+                } label: {
+                    Label("Remove from \(toolLabel)", systemImage: "trash")
+                }
+                .disabled(!nativeSupported)
+
+                if hostCount > 1 {
+                    Button(role: .destructive) {
+                        confirmingEverywhere = true
+                    } label: {
+                        Label("Remove from all (\(hostCount)) apps", systemImage: "trash.slash")
+                    }
+                }
+            } label: {
                 if removing {
-                    ProgressView()
-                        .scaleEffect(0.45)
-                        .frame(width: 14, height: 14)
+                    ProgressView().scaleEffect(0.45).frame(width: 14, height: 14)
                 } else {
-                    Image(systemName: "trash")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(hovering ? .red : .secondary)
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(hovering ? .primary : .secondary)
                         .padding(4)
+                        .contentShape(Rectangle())
                 }
             }
-            .buttonStyle(.plain)
-            .disabled(removing)
-            .onHover { hovering = $0 }
-            .help(nativeSupported ? "Remove \(server.name) from \(toolLabel)" : "This app's format isn't supported natively yet")
-            .confirmationDialog(
-                "Remove “\(server.name)” from \(toolLabel)?",
-                isPresented: $confirming,
-                titleVisibility: .visible
-            ) {
-                Button("Remove", role: .destructive) {
-                    performRemove()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text(nativeSupported
-                     ? "A backup of the config file is saved before removing."
-                     : "\(toolLabel) uses a config format we can't edit yet. Remove it manually.")
-            }
-            .alert("Couldn't remove server", isPresented: $showingError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage ?? "Unknown error.")
-            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
         }
         .padding(.leading, 60)
         .padding(.trailing, 10)
@@ -270,11 +370,72 @@ struct ServerRow: View {
         .contentShape(Rectangle())
         .background(hovering ? accent.opacity(0.05) : Color.clear)
         .onHover { hovering = $0 }
+        .confirmationDialog(
+            "Remove \u{201C}\(server.name)\u{201D} from \(toolLabel)?",
+            isPresented: $confirming,
+            titleVisibility: .visible
+        ) {
+            Button("Remove", role: .destructive) { performRemove() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(nativeSupported
+                 ? "A backup of the config file is saved before removing."
+                 : "\(toolLabel) uses a config format we can't edit yet. Remove it manually.")
+        }
+        .confirmationDialog(
+            "Remove \u{201C}\(server.name)\u{201D} from all \(hostCount) apps?",
+            isPresented: $confirmingEverywhere,
+            titleVisibility: .visible
+        ) {
+            Button("Remove everywhere", role: .destructive) { performRemoveEverywhere() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This deletes \(server.name) from every detected app that has it. Each file is backed up first.")
+        }
+        .alert("Couldn't remove server", isPresented: $showingError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "Unknown error.")
+        }
     }
+
+    // MARK: Health indicator
+
+    @ViewBuilder
+    private var healthDot: some View {
+        let color: Color = {
+            switch health {
+            case .ok:       return .green
+            case .warn:     return .orange
+            case .fail:     return .red
+            case .unknown:  return .clear
+            }
+        }()
+        if checkingHealth {
+            ProgressView().scaleEffect(0.35).frame(width: 10, height: 10)
+        } else if case .unknown = health {
+            EmptyView()
+        } else {
+            Circle()
+                .fill(color)
+                .frame(width: 7, height: 7)
+                .help(healthTooltip)
+        }
+    }
+
+    private var healthTooltip: String {
+        switch health {
+        case .ok(let d):   return "OK — \(d)"
+        case .warn(let d): return "Warning — \(d)"
+        case .fail(let d): return "Failed — \(d)"
+        case .unknown:     return ""
+        }
+    }
+
+    // MARK: Actions
 
     private func performRemove() {
         removing = true
-        // File I/O is fast enough to run on main actor. Store triggers refresh() on success.
         Task { @MainActor in
             let outcome = store.removeServer(toolID: toolID, name: server.name)
             removing = false
@@ -283,5 +444,23 @@ struct ServerRow: View {
                 showingError = true
             }
         }
+    }
+
+    private func performRemoveEverywhere() {
+        removing = true
+        Task { @MainActor in
+            let outcome = store.removeServerEverywhere(name: server.name)
+            removing = false
+            if !outcome.failures.isEmpty && outcome.successes.isEmpty {
+                errorMessage = outcome.failures.first?.message ?? "Unknown error"
+                showingError = true
+            }
+        }
+    }
+
+    private func runHealthCheck() async {
+        checkingHealth = true
+        health = await HealthCheck.check(server)
+        checkingHealth = false
     }
 }

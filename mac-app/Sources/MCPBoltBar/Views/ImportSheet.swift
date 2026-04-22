@@ -8,13 +8,24 @@ struct ImportSheet: View {
     let onClose: () -> Void
 
     enum Stage { case paste, preview, done }
+    enum Source: String, CaseIterable { case paste = "Paste JSON"; case url = "From URL" }
 
     @State private var stage: Stage = .paste
+    @State private var source: Source = .paste
     @State private var rawText: String = ""
+    @State private var remoteURL: String = ""
+    @State private var fetchingURL = false
     @State private var servers: [ParsedServer] = []
     @State private var selectedTools: Set<String> = []
     @State private var parseError: String?
     @State private var importResults: [ImportResult] = []
+
+    // Project scope
+    @State private var useProjectScope: Bool = false
+    @State private var projectRoot: String? = nil
+
+    // Diff preview
+    @State private var showingDiff: Bool = false
 
     struct ImportResult: Identifiable {
         let id = UUID()
@@ -92,31 +103,73 @@ struct ImportSheet: View {
 
     private var pasteView: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Paste the server config JSON")
-                .font(.system(size: 12, weight: .semibold))
+            // Source segmented picker
+            Picker("", selection: $source) {
+                ForEach(Source.allCases, id: \.self) { s in
+                    Text(s.rawValue).tag(s)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
 
-            Text("From GitHub README, mcpservers.org, or anywhere else.")
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
+            if source == .paste {
+                Text("Paste the server config JSON")
+                    .font(.system(size: 12, weight: .semibold))
 
-            ZStack(alignment: .topLeading) {
-                TextEditor(text: $rawText)
-                    .font(.system(size: 11, design: .monospaced))
-                    .padding(6)
+                Text("From GitHub README, mcpservers.org, or anywhere else.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: $rawText)
+                        .font(.system(size: 11, design: .monospaced))
+                        .padding(6)
+                        .background(Color(NSColor.textBackgroundColor))
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 7)
+                                .stroke(Color(NSColor.separatorColor).opacity(0.6), lineWidth: 0.5)
+                        )
+                        .frame(height: 200)
+
+                    if rawText.isEmpty {
+                        Text(placeholderJSON)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.secondary.opacity(0.5))
+                            .padding(12)
+                            .allowsHitTesting(false)
+                    }
+                }
+            } else {
+                Text("Paste a URL to an MCP JSON config")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Raw GitHub gist, pastebin, or any URL that returns JSON.")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+
+                HStack(spacing: 8) {
+                    TextField("https://gist.githubusercontent.com/\u{2026}/raw/mcp.json", text: $remoteURL)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(size: 11, design: .monospaced))
+                    if fetchingURL {
+                        ProgressView().scaleEffect(0.55)
+                    }
+                }
+
+                if !rawText.isEmpty {
+                    ScrollView {
+                        Text(rawText)
+                            .font(.system(size: 10, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                    }
+                    .frame(height: 140)
                     .background(Color(NSColor.textBackgroundColor))
                     .clipShape(RoundedRectangle(cornerRadius: 7))
                     .overlay(
                         RoundedRectangle(cornerRadius: 7)
                             .stroke(Color(NSColor.separatorColor).opacity(0.6), lineWidth: 0.5)
                     )
-                    .frame(height: 200)
-
-                if rawText.isEmpty {
-                    Text(placeholderJSON)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundColor(.secondary.opacity(0.5))
-                        .padding(12)
-                        .allowsHitTesting(false)
                 }
             }
 
@@ -135,15 +188,28 @@ struct ImportSheet: View {
             }
 
             HStack {
-                Button(action: pasteFromClipboard) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "doc.on.clipboard")
-                        Text("Paste from clipboard")
+                if source == .paste {
+                    Button(action: pasteFromClipboard) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc.on.clipboard")
+                            Text("Paste from clipboard")
+                        }
+                        .font(.system(size: 11, weight: .medium))
                     }
-                    .font(.system(size: 11, weight: .medium))
+                    .buttonStyle(.plain)
+                    .foregroundColor(.accentColor)
+                } else {
+                    Button(action: fetchFromURL) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.down.circle")
+                            Text("Fetch")
+                        }
+                        .font(.system(size: 11, weight: .medium))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.accentColor)
+                    .disabled(remoteURL.trimmingCharacters(in: .whitespaces).isEmpty || fetchingURL)
                 }
-                .buttonStyle(.plain)
-                .foregroundColor(.accentColor)
 
                 Spacer()
 
@@ -166,6 +232,40 @@ struct ImportSheet: View {
             }
         }
         .padding(14)
+    }
+
+    private func fetchFromURL() {
+        let trimmed = remoteURL.trimmingCharacters(in: .whitespaces)
+        guard let url = URL(string: trimmed), ["http", "https"].contains(url.scheme ?? "") else {
+            parseError = "Enter a valid http(s) URL."
+            return
+        }
+        parseError = nil
+        fetchingURL = true
+        Task {
+            do {
+                var req = URLRequest(url: url, timeoutInterval: 6.0)
+                req.setValue("application/json", forHTTPHeaderField: "Accept")
+                let (data, resp) = try await URLSession.shared.data(for: req)
+                if let http = resp as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                    await MainActor.run {
+                        parseError = "HTTP \(http.statusCode) — could not fetch config."
+                        fetchingURL = false
+                    }
+                    return
+                }
+                let text = String(data: data, encoding: .utf8) ?? ""
+                await MainActor.run {
+                    rawText = text
+                    fetchingURL = false
+                }
+            } catch {
+                await MainActor.run {
+                    parseError = "Fetch failed: \(error.localizedDescription)"
+                    fetchingURL = false
+                }
+            }
+        }
     }
 
     private let placeholderJSON = """
@@ -217,6 +317,66 @@ struct ImportSheet: View {
                                 onToggle: { toggle(tool.toolID) }
                             )
                         }
+                    }
+
+                    Divider().padding(.vertical, 2)
+
+                    // Project scope
+                    sectionLabel("Scope")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Toggle(isOn: $useProjectScope) {
+                            Text("Write to a project folder instead of user config")
+                                .font(.system(size: 12))
+                        }
+                        .toggleStyle(.checkbox)
+
+                        if useProjectScope {
+                            HStack(spacing: 8) {
+                                Image(systemName: "folder")
+                                    .foregroundColor(.secondary)
+                                Text(projectRoot ?? "No folder chosen")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundColor(projectRoot == nil ? .secondary : .primary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Spacer()
+                                Button(action: pickProjectRoot) {
+                                    Text(projectRoot == nil ? "Choose\u{2026}" : "Change\u{2026}")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundColor(.accentColor)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            Text("Only tools that support project-scope configs will use the folder: Cursor, VS Code, Roo, Claude Code.")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+
+                    Divider().padding(.vertical, 2)
+
+                    // Diff preview toggle
+                    HStack {
+                        sectionLabel("Preview")
+                        Spacer()
+                        Button(action: { showingDiff.toggle() }) {
+                            HStack(spacing: 3) {
+                                Image(systemName: showingDiff ? "eye.slash" : "eye")
+                                Text(showingDiff ? "Hide diff" : "Show diff")
+                            }
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.accentColor)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if showingDiff {
+                        DiffPreviewBlock(
+                            servers: servers,
+                            selectedTools: Array(selectedTools),
+                            scope: useProjectScope ? .project : .user,
+                            projectRoot: useProjectScope ? projectRoot : nil
+                        )
                     }
                 }
                 .padding(14)
@@ -452,18 +612,31 @@ struct ImportSheet: View {
         let toolLookup = Dictionary(uniqueKeysWithValues:
             store.detectedTools.map { ($0.toolID, $0.label) })
 
+        let wantsProject = useProjectScope && projectRoot != nil
+        let scope: ConfigScope = wantsProject ? .project : .user
+
         for server in servers {
             for toolID in selectedTools {
                 let label = toolLookup[toolID] ?? toolID
+
+                // Project scope only applies to tools that support it.
+                // For others, silently fall back to user scope.
+                let effectiveScope: ConfigScope = (scope == .project
+                    && ToolSpecs.projectScopedTools.contains(toolID))
+                    ? .project : .user
+
                 do {
                     try ConfigWriter.writeServer(
                         toolID: toolID,
+                        scope: effectiveScope,
+                        projectRoot: effectiveScope == .project ? projectRoot : nil,
                         name: server.name,
                         config: server.config
                     )
+                    let suffix = effectiveScope == .project ? " (project)" : ""
                     importResults.append(.init(
                         serverName: server.name, toolID: toolID,
-                        toolLabel: label, success: true, message: nil
+                        toolLabel: label + suffix, success: true, message: nil
                     ))
                 } catch {
                     importResults.append(.init(
@@ -477,6 +650,18 @@ struct ImportSheet: View {
 
         withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
             stage = .done
+        }
+    }
+
+    private func pickProjectRoot() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose a project folder"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        NSApp.activate(ignoringOtherApps: true)
+        if panel.runModal() == .OK, let url = panel.url {
+            projectRoot = url.path
         }
     }
 

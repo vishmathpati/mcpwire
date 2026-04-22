@@ -4,8 +4,8 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var store: ServerStore
+    @StateObject private var overlay = OverlayPresenter()
     @State private var tab: Int = 0
-    @State private var showingImport: Bool = false
 
     // Header gradient — refined graphite (no purple)
     static let headerGrad = LinearGradient(
@@ -19,21 +19,45 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if showingImport {
-                ImportSheet(onClose: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
-                        showingImport = false
-                    }
-                })
-            } else {
+            switch overlay.overlay {
+            case .none:
                 header
                 toolbar
                 tabBar
                 Divider()
                 content
+            case .importSheet:
+                ImportSheet(onClose: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                        overlay.dismiss()
+                    }
+                })
+            case .editServer(let toolID, let toolLabel, let serverName):
+                EditServerSheet(
+                    toolID: toolID,
+                    toolLabel: toolLabel,
+                    serverName: serverName,
+                    onClose: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                            overlay.dismiss()
+                        }
+                    }
+                )
+            case .copyToApps(let toolID, let toolLabel, let serverName):
+                CopyToAppsSheet(
+                    serverName: serverName,
+                    sourceToolID: toolID,
+                    sourceToolLabel: toolLabel,
+                    onClose: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                            overlay.dismiss()
+                        }
+                    }
+                )
             }
         }
         .frame(width: 460)
+        .environmentObject(overlay)
     }
 
     // MARK: - Gradient header
@@ -85,9 +109,24 @@ struct ContentView: View {
                 // More menu
                 Menu {
                     Button {
+                        ExportConfigs.exportViaSavePanel(tools: store.tools)
+                    } label: {
+                        Label("Export configs\u{2026}", systemImage: "square.and.arrow.up")
+                    }
+
+                    Toggle(isOn: Binding(
+                        get: { AppActions.launchAtLoginEnabled },
+                        set: { AppActions.launchAtLoginEnabled = $0 }
+                    )) {
+                        Label("Launch at login", systemImage: "power.circle")
+                    }
+
+                    Divider()
+
+                    Button {
                         AppActions.checkForUpdates()
                     } label: {
-                        Label("Check for Updates…", systemImage: "arrow.triangle.2.circlepath")
+                        Label("Check for Updates\u{2026}", systemImage: "arrow.triangle.2.circlepath")
                     }
                     Divider()
                     Button {
@@ -170,7 +209,7 @@ struct ContentView: View {
             // Install button
             Button(action: {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
-                    showingImport = true
+                    overlay.show(.importSheet)
                 }
             }) {
                 HStack(spacing: 4) {
@@ -279,7 +318,7 @@ struct ContentView: View {
 
             Button(action: {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
-                    showingImport = true
+                    overlay.show(.importSheet)
                 }
             }) {
                 HStack(spacing: 5) {
