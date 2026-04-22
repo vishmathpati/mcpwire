@@ -1,0 +1,5 @@
+.build/
+MCPBoltBar.app/
+*.o
+*.d
+*.dia
