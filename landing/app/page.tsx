@@ -1,6 +1,6 @@
 import { CopyButton } from "./CopyButton";
 
-const BREW_CMD = "brew install --cask mcpbolt";
+const BREW_CMD = "brew install --cask vishmathpati/mcpbolt/mcpboltbar";
 const GITHUB_URL = "https://github.com/vishmathpati/mcpbolt";
 const DOWNLOAD_URL = `${GITHUB_URL}/releases/latest`;
 
@@ -141,7 +141,7 @@ export default function Page() {
           </a>
         </div>
         <div className="meta-line">
-          macOS 13+ · Apple Silicon and Intel · <a href={GITHUB_URL}>MIT licensed</a>
+          macOS 14+ · Apple Silicon and Intel · <a href={GITHUB_URL}>MIT licensed</a>
         </div>
       </header>
 
@@ -277,7 +277,7 @@ export default function Page() {
             <a href={`${GITHUB_URL}/releases`} target="_blank" rel="noreferrer">Releases</a>
             <a href={`${GITHUB_URL}/blob/main/LICENSE`} target="_blank" rel="noreferrer">License</a>
           </div>
-          <div>Built by <a href={GITHUB_URL}>@vishmathpati</a> · MIT licensed · macOS 13+</div>
+          <div>Built by <a href={GITHUB_URL}>@vishmathpati</a> · MIT licensed · macOS 14+</div>
         </div>
       </footer>
     </>
