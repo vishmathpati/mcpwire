@@ -12,6 +12,7 @@ import {
 } from './prompts.ts'
 import { banner, success, warn, info, hint, error, section, c } from './display.ts'
 import { runList } from './status.ts'
+import { runRemove } from './remove.ts'
 
 // ── Subcommand routing ────────────────────────────────────────────────────────
 
@@ -23,13 +24,24 @@ if (cmd === 'list' || cmd === 'status' || cmd === 'ls') {
   process.exit(0)
 }
 
+if (cmd === 'remove' || cmd === 'uninstall' || cmd === 'rm') {
+  const nameArg = args[1]
+  runRemove(nameArg).then(() => process.exit(0)).catch((e: unknown) => {
+    error((e as Error).message ?? String(e))
+    process.exit(1)
+  })
+  // don't fall through — runRemove is async
+  // (the promise above handles exit)
+}
+
 if (cmd === '--help' || cmd === '-h' || cmd === 'help') {
   console.log()
   console.log(c.bold('  mcpbolt ⚡') + '  Wire any MCP server into every AI coding tool\n')
   console.log('  Usage:')
-  console.log(c.cyan('    mcpbolt') + '              Interactive install — paste any MCP config')
-  console.log(c.cyan('    mcpbolt list') + '         Show all installed MCP servers across tools')
-  console.log(c.cyan('    mcpbolt --help') + '       Show this help\n')
+  console.log(c.cyan('    mcpbolt') + '                    Interactive install — paste any MCP config')
+  console.log(c.cyan('    mcpbolt list') + '               Show all installed MCP servers across tools')
+  console.log(c.cyan('    mcpbolt remove [name]') + '      Remove an MCP server from one or more tools')
+  console.log(c.cyan('    mcpbolt --help') + '             Show this help\n')
   console.log('  Accepted input formats:')
   console.log(c.dim('    JSON (mcpServers / servers / context_servers)'))
   console.log(c.dim('    claude mcp add <name> --transport http <url>'))

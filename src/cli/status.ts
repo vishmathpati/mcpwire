@@ -99,9 +99,14 @@ export function runList(): void {
       : serverName.padEnd(NAME_W)
 
     const have = toolsWithIt.map(t => c.green(t.label)).join(c.dim('  '))
-    const miss = toolsWithout.length > 0
-      ? c.dim('  missing: ') + toolsWithout.map(t => c.dim(t.label)).join(c.dim(', '))
-      : ''
+
+    let miss = ''
+    if (toolsWithout.length > 0) {
+      const MAX = 3
+      const shown = toolsWithout.slice(0, MAX).map(t => c.dim(t.label)).join(c.dim(', '))
+      const extra = toolsWithout.length > MAX ? c.dim(` +${toolsWithout.length - MAX} more`) : ''
+      miss = c.dim('  missing: ') + shown + extra
+    }
 
     console.log(`  ${c.bold(name)}  ${have}${miss}`)
   }

@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { fileExists } from '../core/detect.ts'
-import { mergeJson } from '../core/merger.ts'
+import { mergeJson, removeJson } from '../core/merger.ts'
 import { readJsonServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
@@ -31,4 +31,8 @@ export const roo: Target = {
   },
 
   readServers(_scope: Scope) { return readJsonServers(projectPath, 'mcpServers') },
+
+  remove(_scope: Scope, name: string, dryRun: boolean) {
+    return removeJson(projectPath, 'mcpServers', name, dryRun)
+  },
 }

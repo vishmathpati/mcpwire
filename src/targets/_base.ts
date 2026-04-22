@@ -16,6 +16,8 @@ export interface Target {
   write(scope: Scope, ir: IR, dryRun: boolean): string
   // Reads currently installed servers from this tool's config
   readServers(scope: Scope): ServerEntry[]
+  // Removes a server by name; returns true if it was found and removed
+  remove(scope: Scope, name: string, dryRun: boolean): boolean
   restartHint?: string
 }
 

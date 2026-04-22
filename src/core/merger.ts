@@ -157,6 +157,93 @@ export function mergeYamlArray(
   return out
 }
 
+// ── Remove helpers ────────────────────────────────────────────────────────────
+
+export function removeJson(
+  filePath: string,
+  key: string,
+  serverName: string,
+  dryRun = false
+): boolean {
+  if (!fs.existsSync(filePath)) return false
+  const raw = fs.readFileSync(filePath, 'utf-8').trim()
+  const data = raw ? parseJson(raw) : {}
+  const servers = data[key] as Record<string, unknown> | undefined
+  if (!servers || !(serverName in servers)) return false
+  delete servers[serverName]
+  if (!dryRun) {
+    backup(filePath)
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n')
+  }
+  return true
+}
+
+export function removeJsonNested(
+  filePath: string,
+  keys: string[],
+  serverName: string,
+  dryRun = false
+): boolean {
+  if (!fs.existsSync(filePath)) return false
+  const raw = fs.readFileSync(filePath, 'utf-8').trim()
+  const data = raw ? parseJson(raw) : {}
+  let cursor = data
+  for (let i = 0; i < keys.length - 1; i++) {
+    const k = keys[i]!
+    if (typeof cursor[k] !== 'object' || cursor[k] === null) return false
+    cursor = cursor[k] as Record<string, unknown>
+  }
+  const lastKey = keys[keys.length - 1]!
+  const servers = cursor[lastKey] as Record<string, unknown> | undefined
+  if (!servers || !(serverName in servers)) return false
+  delete servers[serverName]
+  if (!dryRun) {
+    backup(filePath)
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + '\n')
+  }
+  return true
+}
+
+export function removeYamlArray(
+  filePath: string,
+  key: string,
+  serverName: string,
+  dryRun = false
+): boolean {
+  if (!fs.existsSync(filePath)) return false
+  const raw = fs.readFileSync(filePath, 'utf-8')
+  const data = (parseYaml(raw) as Record<string, unknown>) ?? {}
+  if (!Array.isArray(data[key])) return false
+  const arr = data[key] as Record<string, unknown>[]
+  const idx = arr.findIndex((s) => s['name'] === serverName)
+  if (idx < 0) return false
+  arr.splice(idx, 1)
+  if (!dryRun) {
+    backup(filePath)
+    fs.writeFileSync(filePath, stringifyYaml(data))
+  }
+  return true
+}
+
+export function removeToml(
+  filePath: string,
+  tableKey: string,
+  serverName: string,
+  dryRun = false
+): boolean {
+  if (!fs.existsSync(filePath)) return false
+  const raw = fs.readFileSync(filePath, 'utf-8')
+  const data = parseToml(raw) as Record<string, unknown>
+  const table = data[tableKey] as Record<string, unknown> | undefined
+  if (!table || !(serverName in table)) return false
+  delete table[serverName]
+  if (!dryRun) {
+    backup(filePath)
+    fs.writeFileSync(filePath, stringifyToml(data))
+  }
+  return true
+}
+
 // Merge into a TOML file under [mcp_servers.<name>]
 export function mergeToml(
   filePath: string,

@@ -1,7 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
 import { dirExists, appExists } from '../core/detect.ts'
-import { mergeJson } from '../core/merger.ts'
+import { mergeJson, removeJson } from '../core/merger.ts'
 import { readJsonServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
@@ -32,6 +32,10 @@ export const windsurf: Target = {
   },
 
   readServers(_scope: Scope) { return readJsonServers(configPath, 'mcpServers') },
+
+  remove(_scope: Scope, name: string, dryRun: boolean) {
+    return removeJson(configPath, 'mcpServers', name, dryRun)
+  },
 
   restartHint: 'Restart Windsurf or reload the Cascade panel.',
 }

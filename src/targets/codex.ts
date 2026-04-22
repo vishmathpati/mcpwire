@@ -1,7 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
 import { onPath, dirExists } from '../core/detect.ts'
-import { mergeToml } from '../core/merger.ts'
+import { mergeToml, removeToml } from '../core/merger.ts'
 import { readTomlServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
@@ -34,4 +34,8 @@ export const codex: Target = {
   },
 
   readServers(scope: Scope) { return readTomlServers(this.configPath(scope)) },
+
+  remove(scope: Scope, name: string, dryRun: boolean) {
+    return removeToml(this.configPath(scope), 'mcp_servers', name, dryRun)
+  },
 }

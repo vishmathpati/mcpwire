@@ -1,7 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
 import { dirExists, appExists } from '../core/detect.ts'
-import { mergeJsonNested } from '../core/merger.ts'
+import { mergeJsonNested, removeJsonNested } from '../core/merger.ts'
 import { readJsonServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
@@ -35,6 +35,10 @@ export const zed: Target = {
   },
 
   readServers(scope: Scope) { return readJsonServers(this.configPath(scope), 'context_servers') },
+
+  remove(scope: Scope, name: string, dryRun: boolean) {
+    return removeJsonNested(this.configPath(scope), ['context_servers'], name, dryRun)
+  },
 
   restartHint: 'Restart Zed to pick up the new context server.',
 }

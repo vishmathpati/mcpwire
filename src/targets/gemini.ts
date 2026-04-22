@@ -1,7 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
 import { onPath, dirExists } from '../core/detect.ts'
-import { mergeJson } from '../core/merger.ts'
+import { mergeJson, removeJson } from '../core/merger.ts'
 import { readJsonServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
@@ -34,4 +34,8 @@ export const gemini: Target = {
   },
 
   readServers(scope: Scope) { return readJsonServers(this.configPath(scope), 'mcpServers') },
+
+  remove(scope: Scope, name: string, dryRun: boolean) {
+    return removeJson(this.configPath(scope), 'mcpServers', name, dryRun)
+  },
 }

@@ -1,7 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
 import { dirExists } from '../core/detect.ts'
-import { mergeYamlArray } from '../core/merger.ts'
+import { mergeYamlArray, removeYamlArray } from '../core/merger.ts'
 import { readYamlServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
@@ -42,4 +42,8 @@ export const continueDev: Target = {
   },
 
   readServers(_scope: Scope) { return readYamlServers(userPath) },
+
+  remove(_scope: Scope, name: string, dryRun: boolean) {
+    return removeYamlArray(userPath, 'mcpServers', name, dryRun)
+  },
 }

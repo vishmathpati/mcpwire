@@ -1,7 +1,7 @@
 import os from 'node:os'
 import path from 'node:path'
 import { onPath, appExists } from '../core/detect.ts'
-import { mergeJson } from '../core/merger.ts'
+import { mergeJson, removeJson } from '../core/merger.ts'
 import { readJsonServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
@@ -43,6 +43,10 @@ export const vscode: Target = {
   },
 
   readServers(scope: Scope) { return readJsonServers(this.configPath(scope), 'servers') },
+
+  remove(scope: Scope, name: string, dryRun: boolean) {
+    return removeJson(this.configPath(scope), 'servers', name, dryRun)
+  },
 
   restartHint: 'Run "Developer: Reload Window" in VS Code (Cmd+Shift+P).',
 }
