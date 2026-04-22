@@ -30,6 +30,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupPopover()
 
         store.refresh()
+
+        // Silent update check on launch — shows an alert only if a newer
+        // version is available. Never bothers the user otherwise.
+        AppActions.checkForUpdates(silent: true)
     }
 
     // MARK: - Status item
@@ -84,26 +88,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showContextMenu() {
         let menu = NSMenu()
+
+        let header = NSMenuItem(title: "mcpbolt \(AppActions.currentVersion)", action: nil, keyEquivalent: "")
+        header.isEnabled = false
+        menu.addItem(header)
+        menu.addItem(NSMenuItem.separator())
+
         menu.addItem(withTitle: "Refresh", action: #selector(refreshFromMenu), keyEquivalent: "r")
-        menu.addItem(withTitle: "Install server…", action: #selector(openInstall), keyEquivalent: "")
+        menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdatesFromMenu), keyEquivalent: "")
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(withTitle: "About mcpbolt", action: #selector(aboutFromMenu), keyEquivalent: "")
+        menu.addItem(withTitle: "Visit GitHub", action: #selector(openRepoFromMenu), keyEquivalent: "")
         menu.addItem(NSMenuItem.separator())
         menu.addItem(withTitle: "Quit mcpbolt", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-        menu.items.forEach { $0.target = self }
+
+        menu.items.forEach { if $0.action != nil { $0.target = self } }
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
         statusItem.menu = nil  // reset so left click works normally again
     }
 
-    @objc private func refreshFromMenu() { store.refresh() }
-
-    @objc private func openInstall() {
-        // Open a Terminal running mcpbolt
-        let script = """
-        tell application "Terminal"
-            activate
-            do script "mcpbolt"
-        end tell
-        """
-        if let scriptObj = NSAppleScript(source: script) { scriptObj.executeAndReturnError(nil) }
-    }
+    @objc private func refreshFromMenu()          { store.refresh() }
+    @objc private func checkForUpdatesFromMenu()  { AppActions.checkForUpdates() }
+    @objc private func aboutFromMenu()            { AppActions.about() }
+    @objc private func openRepoFromMenu()         { AppActions.openRepo() }
 }

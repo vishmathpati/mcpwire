@@ -81,6 +81,40 @@ struct ContentView: View {
                 .buttonStyle(.plain)
                 .padding(.leading, 2)
                 .help("Refresh")
+
+                // More menu
+                Menu {
+                    Button {
+                        AppActions.checkForUpdates()
+                    } label: {
+                        Label("Check for Updates…", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    Divider()
+                    Button {
+                        AppActions.about()
+                    } label: {
+                        Label("About mcpbolt", systemImage: "info.circle")
+                    }
+                    Button {
+                        AppActions.openRepo()
+                    } label: {
+                        Label("Visit GitHub", systemImage: "arrow.up.right.square")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        AppActions.quit()
+                    } label: {
+                        Label("Quit mcpbolt", systemImage: "power")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("More")
             }
         }
         .padding(.horizontal, 14)
