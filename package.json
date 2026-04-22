@@ -4,7 +4,7 @@
   "description": "Wire MCP servers into any AI coding tool from one paste",
   "type": "module",
   "bin": {
-    "mcp-wire": "./dist/cli/index.js"
+    "mcp-wire": "dist/cli/index.js"
   },
   "files": [
     "dist/cli/index.js"
@@ -32,6 +32,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vishmathpati/mcp-wire"
+    "url": "git+https://github.com/vishmathpati/mcpwire.git"
   }
 }
