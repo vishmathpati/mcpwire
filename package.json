@@ -1,6 +1,6 @@
 {
   "name": "mcpbolt",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Wire MCP servers into any AI coding tool from one paste",
   "type": "module",
   "bin": {
@@ -28,7 +28,12 @@
     "@types/node": "^25.6.0",
     "typescript": "^5.9.3"
   },
-  "keywords": ["mcp", "model-context-protocol", "cli", "installer"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "cli",
+    "installer"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
