@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { fileExists } from '../core/detect.ts'
 import { mergeJson } from '../core/merger.ts'
+import { readJsonServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
 import { irToClaudeShape } from './_base.ts'
@@ -28,4 +29,6 @@ export const roo: Target = {
   write(scope: Scope, ir: IR, dryRun: boolean) {
     return mergeJson(projectPath, 'mcpServers', ir.name, this.toNative(ir), dryRun)
   },
+
+  readServers(_scope: Scope) { return readJsonServers(projectPath, 'mcpServers') },
 }

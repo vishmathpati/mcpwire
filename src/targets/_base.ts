@@ -1,4 +1,5 @@
 import type { IR } from '../core/ir.ts'
+import type { ServerEntry } from '../core/reader.ts'
 
 export type Scope = 'user' | 'project'
 
@@ -13,6 +14,8 @@ export interface Target {
   toNative(ir: IR): unknown
   // Writes IR into the config file; returns change description
   write(scope: Scope, ir: IR, dryRun: boolean): string
+  // Reads currently installed servers from this tool's config
+  readServers(scope: Scope): ServerEntry[]
   restartHint?: string
 }
 

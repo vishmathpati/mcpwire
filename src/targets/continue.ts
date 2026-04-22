@@ -2,6 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { dirExists } from '../core/detect.ts'
 import { mergeYamlArray } from '../core/merger.ts'
+import { readYamlServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
 
@@ -39,4 +40,6 @@ export const continueDev: Target = {
     // Continue uses an array under "mcpServers" key; mergeYamlArray handles name-based upsert
     return mergeYamlArray(userPath, 'mcpServers', ir.name, this.toNative(ir), dryRun)
   },
+
+  readServers(_scope: Scope) { return readYamlServers(userPath) },
 }

@@ -2,6 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { dirExists, appExists } from '../core/detect.ts'
 import { mergeJson } from '../core/merger.ts'
+import { readJsonServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
 import { irToClaudeShape } from './_base.ts'
@@ -31,6 +32,8 @@ export const cursor: Target = {
     const filePath = this.configPath(scope)
     return mergeJson(filePath, 'mcpServers', ir.name, this.toNative(ir), dryRun)
   },
+
+  readServers(scope: Scope) { return readJsonServers(this.configPath(scope), 'mcpServers') },
 
   restartHint: 'Open Cursor → Settings → MCP and click Refresh to activate.',
 }

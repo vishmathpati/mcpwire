@@ -11,6 +11,35 @@ import {
   promptContinueOnMultiple,
 } from './prompts.ts'
 import { banner, success, warn, info, hint, error, section, c } from './display.ts'
+import { runList } from './status.ts'
+
+// ── Subcommand routing ────────────────────────────────────────────────────────
+
+const args = process.argv.slice(2)
+const cmd = args[0]?.toLowerCase()
+
+if (cmd === 'list' || cmd === 'status' || cmd === 'ls') {
+  runList()
+  process.exit(0)
+}
+
+if (cmd === '--help' || cmd === '-h' || cmd === 'help') {
+  console.log()
+  console.log(c.bold('  mcpbolt ⚡') + '  Wire any MCP server into every AI coding tool\n')
+  console.log('  Usage:')
+  console.log(c.cyan('    mcpbolt') + '              Interactive install — paste any MCP config')
+  console.log(c.cyan('    mcpbolt list') + '         Show all installed MCP servers across tools')
+  console.log(c.cyan('    mcpbolt --help') + '       Show this help\n')
+  console.log('  Accepted input formats:')
+  console.log(c.dim('    JSON (mcpServers / servers / context_servers)'))
+  console.log(c.dim('    claude mcp add <name> --transport http <url>'))
+  console.log(c.dim('    npx / docker / uvx command strings'))
+  console.log(c.dim('    YAML (Continue), TOML (Codex), bare URL'))
+  console.log()
+  process.exit(0)
+}
+
+// ── Main install flow ─────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   banner()
@@ -32,10 +61,20 @@ async function main(): Promise<void> {
   }
 
   section('Detected')
-  info(`Format: ${c.cyan(parsed.detectedFormat)}`)
-  info(`Servers: ${c.bold(String(parsed.servers.length))} — ${parsed.servers.map((s) => c.cyan(s.name)).join(', ')}`)
+  info(`Format : ${c.cyan(parsed.detectedFormat)}`)
+  info(`Servers : ${c.bold(String(parsed.servers.length))} — ${parsed.servers.map((s) => c.cyan(s.name)).join(', ')}`)
 
-  // 3. If multiple servers, pick one (batch install is a v2 feature)
+  // Show parsed details for CLI commands / URLs so user can verify
+  const first = parsed.servers[0]
+  if (first) {
+    if (first.transport === 'stdio' && first.command) {
+      info(`Command : ${c.dim(`${first.command} ${(first.args ?? []).join(' ')}`.trim())}`)
+    } else if (first.url) {
+      info(`URL     : ${c.dim(first.url)}`)
+    }
+  }
+
+  // 3. If multiple servers, pick one
   let ir = await promptContinueOnMultiple(parsed.servers)
 
   // 4. Allow rename
@@ -60,7 +99,7 @@ async function main(): Promise<void> {
     for (const { target, scope } of selections) {
       const filePath = target.configPath(scope)
       try {
-        target.write(scope, ir, true) // dry run
+        target.write(scope, ir, true)
         info(`${c.bold(target.name)} (${scope}) → ${c.dim(filePath)}`)
       } catch (e) {
         warn(`${target.name}: ${(e as Error).message}`)

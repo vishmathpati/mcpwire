@@ -2,6 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { onPath, dirExists } from '../core/detect.ts'
 import { mergeToml } from '../core/merger.ts'
+import { readTomlServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
 import { irToCodexShape } from './_base.ts'
@@ -31,4 +32,6 @@ export const codex: Target = {
     const filePath = this.configPath(scope)
     return mergeToml(filePath, 'mcp_servers', ir.name, this.toNative(ir), dryRun)
   },
+
+  readServers(scope: Scope) { return readTomlServers(this.configPath(scope)) },
 }

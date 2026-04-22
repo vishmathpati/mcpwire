@@ -2,6 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { appExists, dirExists } from '../core/detect.ts'
 import { mergeJson } from '../core/merger.ts'
+import { readJsonServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
 import { irToClaudeShape } from './_base.ts'
@@ -36,6 +37,10 @@ export const claudeDesktop: Target = {
 
   write(scope: Scope, ir: IR, dryRun: boolean) {
     return mergeJson(configPath, 'mcpServers', ir.name, this.toNative(ir), dryRun)
+  },
+
+  readServers(_scope: Scope) {
+    return readJsonServers(configPath, 'mcpServers')
   },
 
   restartHint: 'Quit and reopen Claude Desktop to load the new server.',

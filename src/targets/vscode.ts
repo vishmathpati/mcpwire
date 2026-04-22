@@ -2,6 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { onPath, appExists } from '../core/detect.ts'
 import { mergeJson } from '../core/merger.ts'
+import { readJsonServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
 import { irToVsCodeShape } from './_base.ts'
@@ -40,6 +41,8 @@ export const vscode: Target = {
     // VS Code uses "servers" not "mcpServers"
     return mergeJson(filePath, 'servers', ir.name, this.toNative(ir), dryRun)
   },
+
+  readServers(scope: Scope) { return readJsonServers(this.configPath(scope), 'servers') },
 
   restartHint: 'Run "Developer: Reload Window" in VS Code (Cmd+Shift+P).',
 }

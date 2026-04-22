@@ -2,6 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { dirExists, appExists } from '../core/detect.ts'
 import { mergeJson } from '../core/merger.ts'
+import { readJsonServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
 import { irToClaudeShape } from './_base.ts'
@@ -29,6 +30,8 @@ export const windsurf: Target = {
   write(scope: Scope, ir: IR, dryRun: boolean) {
     return mergeJson(configPath, 'mcpServers', ir.name, this.toNative(ir), dryRun)
   },
+
+  readServers(_scope: Scope) { return readJsonServers(configPath, 'mcpServers') },
 
   restartHint: 'Restart Windsurf or reload the Cascade panel.',
 }

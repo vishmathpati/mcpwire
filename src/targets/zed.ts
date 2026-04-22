@@ -2,6 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { dirExists, appExists } from '../core/detect.ts'
 import { mergeJsonNested } from '../core/merger.ts'
+import { readJsonServers } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
 import { irToZedShape } from './_base.ts'
@@ -32,6 +33,8 @@ export const zed: Target = {
     // Zed stores MCPs under "context_servers" inside the broader settings.json
     return mergeJsonNested(filePath, ['context_servers'], ir.name, this.toNative(ir), dryRun)
   },
+
+  readServers(scope: Scope) { return readJsonServers(this.configPath(scope), 'context_servers') },
 
   restartHint: 'Restart Zed to pick up the new context server.',
 }
