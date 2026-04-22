@@ -35,3 +35,12 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # backup files created by mcp-wire
 *.bak
+
+# local test artifacts (configs written by mcpbolt during development testing)
+.mcp.json
+.cursor/
+.vscode/
+.codex/
+.gemini/
+.zed/
+CLAUDE.md
