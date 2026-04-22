@@ -8,7 +8,7 @@ struct ImportSheet: View {
     let onClose: () -> Void
 
     enum Stage { case paste, preview, done }
-    enum Source: String, CaseIterable { case paste = "Paste JSON"; case url = "From URL" }
+    enum Source: String, CaseIterable { case paste = "Paste"; case url = "From URL" }
 
     @State private var stage: Stage = .paste
     @State private var source: Source = .paste
@@ -113,10 +113,10 @@ struct ImportSheet: View {
             .labelsHidden()
 
             if source == .paste {
-                Text("Paste the server config JSON")
+                Text("Paste a JSON config or an mcp-add CLI command")
                     .font(.system(size: 12, weight: .semibold))
 
-                Text("From GitHub README, mcpservers.org, or anywhere else.")
+                Text("JSON from a README, or a command like \"claude mcp add context7 --transport http https://…\".")
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
 
