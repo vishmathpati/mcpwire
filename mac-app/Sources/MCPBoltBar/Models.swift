@@ -31,6 +31,10 @@ struct ToolSummary: Identifiable {
 
 // MARK: - Tool registry (order = display order)
 
+/// Tool IDs that are still fully supported (config read/write works) but are
+/// hidden from all UI surfaces until they're ready for prime time.
+let HIDDEN_TOOL_IDS: Set<String> = ["continue"]
+
 let ALL_TOOL_META: [(id: String, label: String, short: String)] = [
     ("claude-desktop", "Claude Desktop", "CD"),
     ("claude-code",    "Claude Code",    "CC"),

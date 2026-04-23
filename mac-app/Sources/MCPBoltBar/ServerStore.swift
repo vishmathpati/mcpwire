@@ -9,8 +9,11 @@ final class ServerStore: ObservableObject {
     @Published var isLoading:  Bool          = false
     @Published var searchText: String        = ""
 
-    // Only detected tools, in display order
-    var detectedTools: [ToolSummary] { tools.filter { $0.detected } }
+    // Only detected tools, in display order. Hidden tools are excluded from
+    // all UI surfaces but their configs are still read/written normally.
+    var detectedTools: [ToolSummary] {
+        tools.filter { $0.detected && !HIDDEN_TOOL_IDS.contains($0.toolID) }
+    }
 
     // Unique server names across all detected tools
     var allServerNames: [String] {

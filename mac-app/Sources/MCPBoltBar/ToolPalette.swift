@@ -73,7 +73,7 @@ struct ToolPalette {
     static func appImage(for toolID: String) -> NSImage? {
         let candidates: [String: [String]] = [
             "claude-desktop": ["/Applications/Claude.app"],
-            "claude-code":    ["/Applications/Claude Code Tool Manager.app"],
+            "claude-code":    ["/Applications/Claude.app"],   // same icon as Desktop
             "cursor":         ["/Applications/Cursor.app",
                                NSString("~/Applications/Cursor.app").expandingTildeInPath],
             "vscode":         ["/Applications/Visual Studio Code.app",
