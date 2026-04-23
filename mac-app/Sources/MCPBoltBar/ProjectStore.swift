@@ -172,12 +172,13 @@ final class ProjectStore: ObservableObject {
     /// in multiple scanners (e.g. mysnapfinder in both claude.json AND codex sqlite).
     /// Results are merged by path, combining sources so the Codex tab shows it too.
     nonisolated private static func findProjects(excluding existingPaths: Set<String>) -> [DiscoveredProject] {
-        let claudeFound = fromClaudeJson(excluding: existingPaths)
-        let codexFound  = fromCodexSqlite(excluding: existingPaths)
-        let fsFound     = fromFilesystem(excluding: existingPaths)
+        let claudeFound      = fromClaudeJson(excluding: existingPaths)
+        let codexFound       = fromCodexSqlite(excluding: existingPaths)
+        let codexConfigFound = fromCodexConfig(excluding: existingPaths)
+        let fsFound          = fromFilesystem(excluding: existingPaths)
 
         var byPath: [String: DiscoveredProject] = [:]
-        for project in claudeFound + codexFound + fsFound {
+        for project in claudeFound + codexFound + codexConfigFound + fsFound {
             if let existing = byPath[project.path] {
                 byPath[project.path] = DiscoveredProject(
                     id:            existing.id,
@@ -316,6 +317,59 @@ final class ProjectStore: ObservableObject {
             ))
             seen.insert(canonical)
             if found.count >= 40 { break }
+        }
+
+        return found
+    }
+
+    /// Read ~/.codex/config.toml → [projects."<path>"] keys.
+    /// These are every project the user has explicitly trusted in Codex — a precise list.
+    nonisolated private static func fromCodexConfig(excluding existingPaths: Set<String>) -> [DiscoveredProject] {
+        let fm   = FileManager.default
+        let home = NSHomeDirectory()
+        let configPath = (home as NSString).appendingPathComponent(".codex/config.toml")
+
+        guard let content = try? String(contentsOfFile: configPath, encoding: .utf8) else { return [] }
+
+        let broadPaths: Set<String> = [
+            home, "/",
+            (home as NSString).appendingPathComponent("Desktop"),
+            (home as NSString).appendingPathComponent("Downloads"),
+            (home as NSString).appendingPathComponent("Documents"),
+            (home as NSString).appendingPathComponent("Library"),
+        ]
+
+        // Match [projects."/path/to/folder"] TOML section headers
+        guard let regex = try? NSRegularExpression(pattern: #"\[projects\."([^"]+)"\]"#) else { return [] }
+        let nsContent = content as NSString
+        let matches = regex.matches(in: content, range: NSRange(location: 0, length: nsContent.length))
+
+        var seen = existingPaths
+        var found: [DiscoveredProject] = []
+
+        for match in matches {
+            guard let pathRange = Range(match.range(at: 1), in: content) else { continue }
+            let rawPath = String(content[pathRange])
+            let canonical = Project.canonicalize(rawPath)
+
+            guard !seen.contains(canonical) else { continue }
+            guard !broadPaths.contains(canonical) else { continue }
+
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: canonical, isDirectory: &isDir), isDir.boolValue else { continue }
+
+            let hasGit = fm.fileExists(atPath: (canonical as NSString).appendingPathComponent(".git"))
+            let tools  = detectedTools(at: canonical, fm: fm)
+
+            found.append(DiscoveredProject(
+                id:            UUID(),
+                path:          canonical,
+                displayName:   Project.folderName(at: canonical),
+                hasGit:        hasGit,
+                detectedTools: tools,
+                sources:       [.codexCLI]
+            ))
+            seen.insert(canonical)
         }
 
         return found
