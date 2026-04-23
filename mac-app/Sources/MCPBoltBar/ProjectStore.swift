@@ -144,89 +144,146 @@ final class ProjectStore: ObservableObject {
 
     // MARK: - Background scan helpers (nonisolated — runs on Task.detached)
 
+    /// Two-source discovery:
+    /// 1. ~/.claude.json `projects` keys — every folder Claude Code has ever opened (most accurate)
+    /// 2. Filesystem walk of common dev roots — catches Cursor/VSCode-only projects
     nonisolated private static func findProjects(excluding existingPaths: Set<String>) -> [DiscoveredProject] {
-        let fm   = FileManager.default
-        let home = NSHomeDirectory()
-
-        let rootNames = ["Projects", "Developer", "dev", "code", "src", "workspace", "Sites", "Documents"]
-        let searchRoots = rootNames
-            .map { (home as NSString).appendingPathComponent($0) }
-            .filter { fm.fileExists(atPath: $0) }
-
-        let skipDirs: Set<String> = [
-            "node_modules", ".git", ".cache", "Library", ".Trash",
-            "build", "dist", ".next", "vendor", ".npm", ".yarn",
-            "DerivedData", ".gradle", "__pycache__", "Packages"
-        ]
-
+        var seen = existingPaths
         var found: [DiscoveredProject] = []
-        var seen  = existingPaths
 
-        for root in searchRoots {
-            guard let level1 = try? fm.contentsOfDirectory(atPath: root) else { continue }
-            for name in level1.sorted() {
-                guard !name.hasPrefix("."), !skipDirs.contains(name) else { continue }
-                let path = (root as NSString).appendingPathComponent(name)
-                var isDir: ObjCBool = false
-                guard fm.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else { continue }
+        // Source 1 — ~/.claude.json (fast, authoritative)
+        found.append(contentsOf: fromClaudeJson(excluding: &seen))
 
-                if let p = checkProject(at: path, excluding: seen) {
-                    found.append(p)
-                    seen.insert(p.path)
-                } else {
-                    // Level-2: org/company folders (e.g. ~/Developer/acme/repo)
-                    guard let level2 = try? fm.contentsOfDirectory(atPath: path) else { continue }
-                    for name2 in level2.prefix(20) {
-                        guard !name2.hasPrefix("."), !skipDirs.contains(name2) else { continue }
-                        let path2 = (path as NSString).appendingPathComponent(name2)
-                        var isDir2: ObjCBool = false
-                        guard fm.fileExists(atPath: path2, isDirectory: &isDir2), isDir2.boolValue else { continue }
-                        if let p = checkProject(at: path2, excluding: seen) {
-                            found.append(p)
-                            seen.insert(p.path)
-                        }
-                        if found.count >= 80 { break }
-                    }
-                }
-                if found.count >= 80 { break }
-            }
-            if found.count >= 80 { break }
-        }
+        // Source 2 — filesystem walk (catches projects not yet opened with Claude Code)
+        found.append(contentsOf: fromFilesystem(excluding: &seen))
 
         return found.sorted {
             $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
         }
     }
 
-    nonisolated private static func checkProject(at path: String, excluding: Set<String>) -> DiscoveredProject? {
-        let fm        = FileManager.default
+    /// Read all project paths from ~/.claude.json → `projects` dictionary.
+    nonisolated private static func fromClaudeJson(excluding seen: inout Set<String>) -> [DiscoveredProject] {
+        let fm   = FileManager.default
+        let home = NSHomeDirectory()
+        let claudeJsonPath = (home as NSString).appendingPathComponent(".claude.json")
+
+        guard let data     = fm.contents(atPath: claudeJsonPath),
+              let json     = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let projects = json["projects"] as? [String: Any]
+        else { return [] }
+
+        var found: [DiscoveredProject] = []
+
+        for rawPath in projects.keys {
+            let canonical = Project.canonicalize(rawPath)
+            guard !seen.contains(canonical) else { continue }
+
+            // Skip git worktrees Claude Code creates automatically
+            guard !canonical.contains("/.claude/worktrees/") else { continue }
+            // Skip internal tool directories (Paperclip etc.)
+            guard !canonical.contains("/.paperclip/") else { continue }
+            // Skip root and home dir itself
+            guard canonical != "/", canonical != home else { continue }
+            // Must exist on disk as a directory
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: canonical, isDirectory: &isDir), isDir.boolValue else { continue }
+
+            let hasGit = fm.fileExists(atPath: (canonical as NSString).appendingPathComponent(".git"))
+            let tools  = detectedTools(at: canonical, fm: fm)
+
+            found.append(DiscoveredProject(
+                id:            UUID(),
+                path:          canonical,
+                displayName:   Project.folderName(at: canonical),
+                hasGit:        hasGit,
+                detectedTools: tools
+            ))
+            seen.insert(canonical)
+            if found.count >= 60 { break }
+        }
+
+        return found
+    }
+
+    /// Walk common dev roots for projects with a .git or MCP config that
+    /// haven't been opened with Claude Code yet.
+    nonisolated private static func fromFilesystem(excluding seen: inout Set<String>) -> [DiscoveredProject] {
+        let fm   = FileManager.default
+        let home = NSHomeDirectory()
+
+        let rootNames = ["Projects", "Developer", "dev", "code", "src", "workspace", "Sites"]
+        let roots = rootNames
+            .map { (home as NSString).appendingPathComponent($0) }
+            .filter { fm.fileExists(atPath: $0) }
+
+        let skip: Set<String> = [
+            "node_modules", ".git", ".cache", "Library", ".Trash",
+            "build", "dist", ".next", "vendor", ".npm", ".yarn",
+            "DerivedData", ".gradle", "__pycache__"
+        ]
+
+        var found: [DiscoveredProject] = []
+
+        for root in roots {
+            guard let level1 = try? fm.contentsOfDirectory(atPath: root) else { continue }
+            for name in level1.sorted() {
+                guard !name.hasPrefix("."), !skip.contains(name) else { continue }
+                let path = (root as NSString).appendingPathComponent(name)
+                var isDir: ObjCBool = false
+                guard fm.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else { continue }
+
+                if let p = makeProject(at: path, excluding: seen, fm: fm) {
+                    found.append(p); seen.insert(p.path)
+                } else {
+                    // Level 2 for org/company folders (~/Developer/acme/repo)
+                    guard let level2 = try? fm.contentsOfDirectory(atPath: path) else { continue }
+                    for name2 in level2.prefix(20) {
+                        guard !name2.hasPrefix("."), !skip.contains(name2) else { continue }
+                        let path2 = (path as NSString).appendingPathComponent(name2)
+                        var isDir2: ObjCBool = false
+                        guard fm.fileExists(atPath: path2, isDirectory: &isDir2), isDir2.boolValue else { continue }
+                        if let p = makeProject(at: path2, excluding: seen, fm: fm) {
+                            found.append(p); seen.insert(p.path)
+                        }
+                        if found.count >= 40 { break }
+                    }
+                }
+                if found.count >= 40 { break }
+            }
+            if found.count >= 40 { break }
+        }
+
+        return found
+    }
+
+    nonisolated private static func makeProject(at path: String, excluding: Set<String>, fm: FileManager) -> DiscoveredProject? {
         let canonical = Project.canonicalize(path)
         guard !excluding.contains(canonical) else { return nil }
 
         let hasGit = fm.fileExists(atPath: (canonical as NSString).appendingPathComponent(".git"))
+        let tools  = detectedTools(at: canonical, fm: fm)
+        guard hasGit || !tools.isEmpty else { return nil }
 
-        let toolChecks: [(String, String)] = [
+        return DiscoveredProject(
+            id:            UUID(),
+            path:          canonical,
+            displayName:   Project.folderName(at: canonical),
+            hasGit:        hasGit,
+            detectedTools: tools
+        )
+    }
+
+    nonisolated private static func detectedTools(at path: String, fm: FileManager) -> [String] {
+        let checks: [(String, String)] = [
             (".mcp.json",        "claude"),
             (".cursor/mcp.json", "cursor"),
             (".vscode/mcp.json", "vscode"),
             (".roo/mcp.json",    "roo"),
         ]
-        var tools: [String] = []
-        for (rel, toolID) in toolChecks {
-            if fm.fileExists(atPath: (canonical as NSString).appendingPathComponent(rel)) {
-                tools.append(toolID)
-            }
+        return checks.compactMap { (rel, id) in
+            fm.fileExists(atPath: (path as NSString).appendingPathComponent(rel)) ? id : nil
         }
-
-        guard hasGit || !tools.isEmpty else { return nil }
-
-        return DiscoveredProject(
-            id:             UUID(),
-            path:           canonical,
-            displayName:    Project.folderName(at: canonical),
-            hasGit:         hasGit,
-            detectedTools:  tools
-        )
     }
 
     // MARK: - Counts (for the landing list)
