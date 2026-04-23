@@ -140,8 +140,8 @@ struct ProjectsView: View {
     private func filteredDiscovered(tab: String) -> [DiscoveredProject] {
         guard tab != "all" else { return projects.discovered }
         switch tab {
-        case "claude-code": return projects.discovered.filter { $0.source == .claudeCode }
-        case "codex":       return projects.discovered.filter { $0.source == .codexCLI }
+        case "claude-code": return projects.discovered.filter { $0.sources.contains(.claudeCode) }
+        case "codex":       return projects.discovered.filter { $0.sources.contains(.codexCLI) }
         default:            return projects.discovered.filter { $0.detectedTools.contains(tab) }
         }
     }
@@ -212,11 +212,11 @@ struct ProjectsView: View {
         HStack(alignment: .center, spacing: 10) {
             ZStack {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(sourceColor(disc.source).opacity(0.10))
+                    .fill(sourceColor(disc.primarySource).opacity(0.10))
                     .frame(width: 34, height: 34)
-                Image(systemName: sourceIcon(disc.source))
+                Image(systemName: sourceIcon(disc.primarySource))
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(sourceColor(disc.source))
+                    .foregroundColor(sourceColor(disc.primarySource))
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -230,7 +230,9 @@ struct ProjectsView: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 HStack(spacing: 4) {
-                    sourceBadge(disc.source)
+                    ForEach(disc.orderedSources, id: \.self) { src in
+                        sourceBadge(src)
+                    }
                     if disc.hasGit { gitBadge }
                     ForEach(disc.detectedTools, id: \.self) { toolID in
                         toolBadge(toolID: toolID)

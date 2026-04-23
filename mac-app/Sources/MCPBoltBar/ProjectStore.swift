@@ -4,7 +4,7 @@ import SQLite3
 
 // MARK: - Discovery source
 
-enum DiscoverySource: Equatable {
+enum DiscoverySource: Equatable, Hashable, CaseIterable {
     case claudeCode   // ~/.claude.json → projects
     case codexCLI     // ~/.codex/state_N.sqlite → threads.cwd
     case filesystem   // filesystem walk of ~/Projects, ~/Developer, etc.
@@ -13,13 +13,27 @@ enum DiscoverySource: Equatable {
 // MARK: - Discovered project model
 
 /// A project folder found by auto-scanning this Mac. Not persisted — rebuilt on each scan.
+/// `sources` can contain multiple values when a project is found by more than one scanner
+/// (e.g. a repo used in both Claude Code and Codex CLI).
 struct DiscoveredProject: Identifiable, Equatable {
     let id: UUID
     let path: String
     let displayName: String
     let hasGit: Bool
-    let detectedTools: [String]  // tool IDs whose config file exists in this folder
-    let source: DiscoverySource
+    let detectedTools: [String]
+    let sources: Set<DiscoverySource>
+
+    /// The "primary" source for icon/color display — codex > claude > filesystem.
+    var primarySource: DiscoverySource {
+        if sources.contains(.codexCLI)   { return .codexCLI }
+        if sources.contains(.claudeCode) { return .claudeCode }
+        return .filesystem
+    }
+
+    /// Sources in a consistent display order (claude, codex, filesystem).
+    var orderedSources: [DiscoverySource] {
+        [.claudeCode, .codexCLI, .filesystem].filter { sources.contains($0) }
+    }
 }
 
 // MARK: - Project model
@@ -153,25 +167,39 @@ final class ProjectStore: ObservableObject {
 
     // MARK: - Background scan helpers (nonisolated — runs on Task.detached)
 
-    /// Three-source discovery:
-    /// 1. ~/.claude.json `projects` — every folder Claude Code has ever opened
-    /// 2. ~/.codex/state_N.sqlite `threads.cwd` — every folder Codex CLI has ever opened
-    /// 3. Filesystem walk of common dev roots — catches Cursor/VSCode-only projects
+    /// Three-source discovery. Each scanner runs with only `existingPaths` excluded
+    /// (already-added projects), NOT each other's results. This lets a project appear
+    /// in multiple scanners (e.g. mysnapfinder in both claude.json AND codex sqlite).
+    /// Results are merged by path, combining sources so the Codex tab shows it too.
     nonisolated private static func findProjects(excluding existingPaths: Set<String>) -> [DiscoveredProject] {
-        var seen = existingPaths
-        var found: [DiscoveredProject] = []
+        let claudeFound = fromClaudeJson(excluding: existingPaths)
+        let codexFound  = fromCodexSqlite(excluding: existingPaths)
+        let fsFound     = fromFilesystem(excluding: existingPaths)
 
-        found.append(contentsOf: fromClaudeJson(excluding: &seen))
-        found.append(contentsOf: fromCodexSqlite(excluding: &seen))
-        found.append(contentsOf: fromFilesystem(excluding: &seen))
+        var byPath: [String: DiscoveredProject] = [:]
+        for project in claudeFound + codexFound + fsFound {
+            if let existing = byPath[project.path] {
+                byPath[project.path] = DiscoveredProject(
+                    id:            existing.id,
+                    path:          existing.path,
+                    displayName:   existing.displayName,
+                    hasGit:        existing.hasGit || project.hasGit,
+                    detectedTools: Array(Set(existing.detectedTools + project.detectedTools)).sorted(),
+                    sources:       existing.sources.union(project.sources)
+                )
+            } else {
+                byPath[project.path] = project
+            }
+        }
 
-        return found.sorted {
+        return byPath.values.sorted {
             $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending
         }
     }
 
     /// Read all project paths from ~/.claude.json → `projects` dictionary.
-    nonisolated private static func fromClaudeJson(excluding seen: inout Set<String>) -> [DiscoveredProject] {
+    nonisolated private static func fromClaudeJson(excluding existingPaths: Set<String>) -> [DiscoveredProject] {
+        var seen = existingPaths
         let fm   = FileManager.default
         let home = NSHomeDirectory()
         let claudeJsonPath = (home as NSString).appendingPathComponent(".claude.json")
@@ -206,7 +234,7 @@ final class ProjectStore: ObservableObject {
                 displayName:   Project.folderName(at: canonical),
                 hasGit:        hasGit,
                 detectedTools: tools,
-                source:        .claudeCode
+                sources:       [.claudeCode]
             ))
             seen.insert(canonical)
             if found.count >= 60 { break }
@@ -218,7 +246,8 @@ final class ProjectStore: ObservableObject {
     /// Read ~/.codex/state_N.sqlite → threads.cwd to find every directory
     /// Codex CLI has ever worked in. The tool manager only reads config.toml
     /// for global MCPs; this gives us the actual project history.
-    nonisolated private static func fromCodexSqlite(excluding seen: inout Set<String>) -> [DiscoveredProject] {
+    nonisolated private static func fromCodexSqlite(excluding existingPaths: Set<String>) -> [DiscoveredProject] {
+        var seen = existingPaths
         let fm   = FileManager.default
         let home = NSHomeDirectory()
         let codexDir = (home as NSString).appendingPathComponent(".codex")
@@ -283,7 +312,7 @@ final class ProjectStore: ObservableObject {
                 displayName:   folderName,
                 hasGit:        true,
                 detectedTools: tools,
-                source:        .codexCLI
+                sources:       [.codexCLI]
             ))
             seen.insert(canonical)
             if found.count >= 40 { break }
@@ -294,7 +323,8 @@ final class ProjectStore: ObservableObject {
 
     /// Walk common dev roots for projects with a .git or MCP config that
     /// haven't been opened with Claude Code yet.
-    nonisolated private static func fromFilesystem(excluding seen: inout Set<String>) -> [DiscoveredProject] {
+    nonisolated private static func fromFilesystem(excluding existingPaths: Set<String>) -> [DiscoveredProject] {
+        var seen = existingPaths
         let fm   = FileManager.default
         let home = NSHomeDirectory()
 
@@ -357,7 +387,7 @@ final class ProjectStore: ObservableObject {
             displayName:   Project.folderName(at: canonical),
             hasGit:        hasGit,
             detectedTools: tools,
-            source:        .filesystem
+            sources:       [.filesystem]
         )
     }
 
