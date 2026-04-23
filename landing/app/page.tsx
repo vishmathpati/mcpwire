@@ -41,9 +41,19 @@ const features = [
     body: "Paste a link to a JSON config, preview it, then apply to any supported app.",
   },
   {
-    icon: "📁",
-    title: "Project‑scoped configs",
-    body: "Write to .cursor/mcp.json or .vscode/mcp.json inside a specific project folder.",
+    icon: "🗂️",
+    title: "Projects tab",
+    body: "Manage per‑repo MCP configs. Add a folder, switch between global and project‑scoped servers in one place.",
+  },
+  {
+    icon: "🔍",
+    title: "Auto‑discovery",
+    body: "MCPBolt scans your Mac for Claude Code and Codex CLI projects automatically — no manual setup needed.",
+  },
+  {
+    icon: "📊",
+    title: "Coverage matrix",
+    body: "See every server side‑by‑side across all your tools. Gaps in coverage are obvious at a glance.",
   },
   {
     icon: "👀",
@@ -56,9 +66,9 @@ const features = [
     body: "Every write makes a timestamped backup. One click restores the previous state.",
   },
   {
-    icon: "💾",
-    title: "Export / backup",
-    body: "Bundle every tool's config into a single JSON file for backup or migration.",
+    icon: "🖥️",
+    title: "Full‑screen dashboard",
+    body: "Expand beyond the menu bar popover into a resizable window with sidebar navigation.",
   },
   {
     icon: "🚀",
@@ -122,7 +132,7 @@ export default function Page() {
       <header id="top" className="hero container">
         <div className="tag">
           <span className="tag-dot" />
-          <span>v0.2.0 — 12 new features today</span>
+          <span>v0.5.8 — Projects, auto‑discovery & Codex CLI</span>
         </div>
         <h1>
           One‑click MCP servers<br />
@@ -156,14 +166,24 @@ export default function Page() {
         </div>
       </div>
 
-      {/* Screenshot (simulated popover) */}
+      {/* Screenshot (simulated dashboard) */}
       <div className="shot-wrap container">
-        <div className="shot-card">
+        <div className="shot-card" style={{ maxWidth: 640 }}>
           <div className="shot-header">
             <div className="bolt-round">⚡</div>
-            <div className="shot-title">MCPBolt</div>
+            <div className="shot-title">mcpbolt</div>
             <div style={{ flex: 1 }} />
-            <div className="pill">5 apps</div>
+            <div className="pill">5 apps · 8 servers</div>
+          </div>
+          {/* Tab bar */}
+          <div style={{ display: "flex", gap: 6, padding: "8px 12px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            {["By App", "Coverage", "Projects", "Settings"].map((t, i) => (
+              <div key={t} style={{
+                padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+                background: i === 0 ? "linear-gradient(135deg,#f4c01e,#e8a000)" : "rgba(255,255,255,0.07)",
+                color: i === 0 ? "#111" : "rgba(255,255,255,0.55)"
+              }}>{t}</div>
+            ))}
           </div>
           <div className="shot-body">
             <div className="tool-card">
@@ -191,9 +211,9 @@ export default function Page() {
               <div className="tool-count">1</div>
             </div>
             <div className="tool-card">
-              <div className="tool-icon" style={{ background: "#009688" }}>W</div>
+              <div className="tool-icon" style={{ background: "#10a37f" }}>✦</div>
               <div className="tool-meta">
-                <div className="tool-name">Windsurf</div>
+                <div className="tool-name">Codex CLI</div>
                 <div className="tool-sub">2 servers · healthy</div>
               </div>
               <div className="tool-count">2</div>
