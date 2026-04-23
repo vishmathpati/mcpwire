@@ -68,26 +68,47 @@ struct ToolPalette {
         map[toolID]?.icon ?? "app.fill"
     }
 
-    // Returns the real app icon from NSWorkspace if the app is installed,
-    // nil for CLI-only tools or apps that aren't present on this Mac.
+    // Returns the real app icon if the .app bundle is installed.
+    // Uses Bundle to read CFBundleIconFile directly — more reliable than NSWorkspace.
     static func appImage(for toolID: String) -> NSImage? {
         let candidates: [String: [String]] = [
             "claude-desktop": ["/Applications/Claude.app"],
-            "cursor":         ["/Applications/Cursor.app"],
+            "claude-code":    ["/Applications/Claude Code Tool Manager.app"],
+            "cursor":         ["/Applications/Cursor.app",
+                               NSString("~/Applications/Cursor.app").expandingTildeInPath],
             "vscode":         ["/Applications/Visual Studio Code.app",
                                "/Applications/VSCode.app"],
+            "codex":          ["/Applications/Codex.app"],
             "windsurf":       ["/Applications/Windsurf.app"],
             "zed":            ["/Applications/Zed.app", "/Applications/Zed Preview.app"],
             "roo":            ["/Applications/Roo.app"],
             "continue":       ["/Applications/Continue.app"],
             "cline":          ["/Applications/Cline.app"],
+            "opencode":       ["/Applications/OpenCode.app"],
+            "gemini":         ["/Applications/Gemini.app",
+                               "/Applications/Google Gemini.app"],
         ]
         guard let paths = candidates[toolID] else { return nil }
         let fm = FileManager.default
         for path in paths {
-            if fm.fileExists(atPath: path) {
-                return NSWorkspace.shared.icon(forFile: path)
+            guard fm.fileExists(atPath: path) else { continue }
+            // Read icon directly from bundle — avoids NSWorkspace permission issues
+            if let bundle = Bundle(path: path),
+               let iconName = bundle.infoDictionary?["CFBundleIconFile"] as? String,
+               let resourcePath = bundle.resourcePath {
+                let icns = iconName.hasSuffix(".icns") ? iconName : "\(iconName).icns"
+                if let img = NSImage(contentsOfFile: "\(resourcePath)/\(icns)") {
+                    img.size = NSSize(width: 36, height: 36)
+                    return img
+                }
+                // Some bundles store without extension
+                if let img = NSImage(contentsOfFile: "\(resourcePath)/\(iconName)") {
+                    img.size = NSSize(width: 36, height: 36)
+                    return img
+                }
             }
+            // Fallback to NSWorkspace (still works for most apps)
+            return NSWorkspace.shared.icon(forFile: path)
         }
         return nil
     }

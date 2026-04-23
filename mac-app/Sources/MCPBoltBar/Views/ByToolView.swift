@@ -86,64 +86,58 @@ struct ToolCard: View {
 
     private var cardHeader: some View {
         HStack(spacing: 11) {
-            Button(action: {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
-                    expanded.toggle()
+            // App icon
+            if let nsImg = ToolPalette.appImage(for: tool.toolID) {
+                Image(nsImage: nsImg)
+                    .resizable()
+                    .interpolation(.high)
+                    .frame(width: 36, height: 36)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(accent.opacity(0.16))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: icon)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(accent)
                 }
-            }) {
-                HStack(spacing: 11) {
-                    if let nsImg = ToolPalette.appImage(for: tool.toolID) {
-                        Image(nsImage: nsImg)
-                            .resizable()
-                            .frame(width: 36, height: 36)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                    } else {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(accent.opacity(0.16))
-                                .frame(width: 36, height: 36)
-                            Image(systemName: icon)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(accent)
-                        }
-                    }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(tool.label)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.primary)
-
-                        if expanded {
-                            Text(countLabel)
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                        } else if !filteredServers.isEmpty {
-                            let preview = filteredServers.prefix(3).map { $0.name }.joined(separator: " · ")
-                            let extra   = filteredServers.count > 3 ? " +\(filteredServers.count - 3)" : ""
-                            Text(preview + extra)
-                                .font(.system(size: 11))
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                    Spacer()
-                    if filteredServers.count > 0 {
-                        Text("\(filteredServers.count)")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(accent)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(accent.opacity(0.14))
-                            .clipShape(Capsule())
-                    }
-                }
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
 
-            // Tool-level menu: Restart / Undo
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tool.label)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.primary)
+                if expanded {
+                    Text(countLabel)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                } else if !filteredServers.isEmpty {
+                    let preview = filteredServers.prefix(3).map { $0.name }.joined(separator: " · ")
+                    let extra   = filteredServers.count > 3 ? " +\(filteredServers.count - 3)" : ""
+                    Text(preview + extra)
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            if filteredServers.count > 0 {
+                Text("\(filteredServers.count)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(accent)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(accent.opacity(0.14))
+                    .clipShape(Capsule())
+            }
+
+            // Tool-level menu — captures its own tap, doesn't trigger row toggle
             ToolCardMenu(toolID: tool.toolID, toolLabel: tool.label)
 
-            // Chevron
+            // Chevron (whole row is tappable via onTapGesture below)
             Image(systemName: "chevron.down")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(.secondary)
@@ -152,6 +146,13 @@ struct ToolCard: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 11)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Fires anywhere in the header that isn't the Menu button
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
+                expanded.toggle()
+            }
+        }
     }
 
     private var countLabel: String {
@@ -319,24 +320,10 @@ struct ServerRow: View {
 
     var body: some View {
         HStack(spacing: 9) {
-            // Toggle: on/off switch
-            if toggling {
-                ProgressView().scaleEffect(0.5).frame(width: 28, height: 18)
-            } else {
-                Toggle("", isOn: Binding(
-                    get: { !server.isDisabled },
-                    set: { _ in performToggle() }
-                ))
-                .toggleStyle(.switch)
-                .scaleEffect(0.65)
-                .frame(width: 28)
-                .disabled(!nativeSupported)
-                .help(server.isDisabled
-                      ? "Enable: adds back to \(toolLabel)"
-                      : "Disable: removes from \(toolLabel) without deleting")
-            }
+            // Toggle: green = enabled, red = disabled. Custom pill — no view-swap flicker.
+            togglePill
 
-            // Health dot (always visible after first check)
+            // Health dot (stable — dims while checking, never swapped out)
             healthDotInline
 
             Text(server.name)
@@ -378,12 +365,6 @@ struct ServerRow: View {
                     Task { await runHealthCheck() }
                 } label: {
                     Label("Check health", systemImage: "heart.text.square")
-                }
-
-                Button {
-                    copyInstallLink()
-                } label: {
-                    Label("Copy install link", systemImage: "link.badge.plus")
                 }
 
                 Divider()
@@ -460,25 +441,50 @@ struct ServerRow: View {
 
     // MARK: Health indicators
 
-    // Inline dot shown at the left of the row (replaces the old status-only dot).
-    @ViewBuilder
+    // Stable dot — dims while checking instead of swapping to a spinner (no flicker).
     private var healthDotInline: some View {
-        if checkingHealth {
-            ProgressView().scaleEffect(0.35).frame(width: 8, height: 8)
-        } else {
-            let color: Color = {
-                switch health {
-                case .ok:      return .green
-                case .warn:    return .orange
-                case .fail:    return .red
-                case .unknown: return Color.secondary.opacity(0.3)
-                }
-            }()
+        let color: Color = {
+            switch health {
+            case .ok:      return .green
+            case .warn:    return .orange
+            case .fail:    return .red
+            case .unknown: return Color.secondary.opacity(0.3)
+            }
+        }()
+        return Circle()
+            .fill(color)
+            .frame(width: 7, height: 7)
+            .opacity(checkingHealth ? 0.35 : 1)
+            .animation(.easeInOut(duration: 0.3), value: checkingHealth)
+            .help(healthTooltip)
+    }
+
+    // MARK: Toggle pill
+
+    // Custom green/red pill — no view-hierarchy swap, so zero flicker.
+    private var togglePill: some View {
+        let isOn = !server.isDisabled
+        return ZStack(alignment: isOn ? .trailing : .leading) {
+            Capsule()
+                .fill(isOn ? Color.green : Color.red)
+                .frame(width: 32, height: 18)
             Circle()
-                .fill(color)
-                .frame(width: 7, height: 7)
-                .help(healthTooltip)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.22), radius: 1.5, x: 0, y: 1)
+                .frame(width: 14, height: 14)
+                .padding(2)
         }
+        .frame(width: 32, height: 18)
+        .opacity((!nativeSupported || toggling) ? 0.4 : 1)
+        .animation(.spring(response: 0.22, dampingFraction: 0.72), value: isOn)
+        .animation(.easeOut(duration: 0.1), value: toggling)
+        .onTapGesture {
+            guard nativeSupported, !toggling else { return }
+            performToggle()
+        }
+        .help(server.isDisabled
+              ? "Enable: adds back to \(toolLabel)"
+              : "Disable: removes from \(toolLabel) without deleting")
     }
 
     private var healthTooltip: String {

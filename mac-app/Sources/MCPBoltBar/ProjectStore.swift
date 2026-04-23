@@ -245,22 +245,19 @@ final class ProjectStore: ObservableObject {
     }
 
     /// Read ~/.codex/state_N.sqlite → threads.cwd to find every directory
-    /// Codex CLI has ever worked in. The tool manager only reads config.toml
-    /// for global MCPs; this gives us the actual project history.
+    /// Codex CLI has ever worked in.
     nonisolated private static func fromCodexSqlite(excluding existingPaths: Set<String>) -> [DiscoveredProject] {
         var seen = existingPaths
         let fm   = FileManager.default
         let home = NSHomeDirectory()
         let codexDir = (home as NSString).appendingPathComponent(".codex")
 
-        // Find the highest-versioned state_N.sqlite that exists
         let dbPath = (1...9).reversed().lazy.compactMap { n -> String? in
             let p = (codexDir as NSString).appendingPathComponent("state_\(n).sqlite")
             return fm.fileExists(atPath: p) ? p : nil
         }.first
         guard let dbPath else { return [] }
 
-        // Broad container paths that are not real projects
         let broadPaths: Set<String> = [
             home, "/",
             (home as NSString).appendingPathComponent("Desktop"),
@@ -278,47 +275,31 @@ final class ProjectStore: ObservableObject {
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
         defer { sqlite3_finalize(stmt) }
 
-        // Codex creates session worktrees here — skip the whole dir
         let codexSessionDir = (home as NSString).appendingPathComponent("Documents/Codex")
-
         var found: [DiscoveredProject] = []
 
         while sqlite3_step(stmt) == SQLITE_ROW {
             guard let ptr = sqlite3_column_text(stmt, 0) else { continue }
             let canonical = Project.canonicalize(String(cString: ptr))
-
-            guard !seen.contains(canonical) else { continue }
-            guard !broadPaths.contains(canonical) else { continue }
-            // Skip Codex session worktrees (~/Documents/Codex/2026-04-22-...)
+            guard !seen.contains(canonical), !broadPaths.contains(canonical) else { continue }
             guard !canonical.hasPrefix(codexSessionDir) else { continue }
-            // Skip date-prefixed directories (another sign of a session worktree)
             let folderName = Project.folderName(at: canonical)
             let looksLikeSession = folderName.count > 10 &&
                 folderName.prefix(4).allSatisfy(\.isNumber) &&
                 folderName.dropFirst(4).hasPrefix("-")
             guard !looksLikeSession else { continue }
-
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: canonical, isDirectory: &isDir), isDir.boolValue else { continue }
-
-            // Require git — real projects have it; session clones aren't useful here
             let hasGit = fm.fileExists(atPath: (canonical as NSString).appendingPathComponent(".git"))
             guard hasGit else { continue }
-
-            let tools  = detectedTools(at: canonical, fm: fm)
-
+            let tools = detectedTools(at: canonical, fm: fm)
             found.append(DiscoveredProject(
-                id:            UUID(),
-                path:          canonical,
-                displayName:   folderName,
-                hasGit:        true,
-                detectedTools: tools,
-                sources:       [.codexCLI]
+                id: UUID(), path: canonical, displayName: folderName,
+                hasGit: true, detectedTools: tools, sources: [.codexCLI]
             ))
             seen.insert(canonical)
             if found.count >= 40 { break }
         }
-
         return found
     }
 

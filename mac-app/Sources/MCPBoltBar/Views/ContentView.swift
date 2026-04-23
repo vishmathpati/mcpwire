@@ -94,31 +94,34 @@ struct ContentView: View {
 
             Spacer()
 
-            if store.isLoading {
-                ProgressView()
-                    .scaleEffect(0.6)
-                    .frame(width: 18, height: 18)
-                    .colorScheme(.dark)
-            } else {
-                statPill(
-                    value: "\(store.serverCount)",
-                    label: "server\(store.serverCount == 1 ? "" : "s")",
-                    icon:  "server.rack"
-                )
-                statPill(
-                    value: "\(store.detectedTools.count)",
-                    label: "apps",
-                    icon:  "app.badge.checkmark"
-                )
+            // Pills stay visible at all times — counts update in-place when data arrives.
+            statPill(
+                value: "\(store.serverCount)",
+                label: "server\(store.serverCount == 1 ? "" : "s")",
+                icon:  "server.rack"
+            )
+            statPill(
+                value: "\(store.detectedTools.count)",
+                label: "apps",
+                icon:  "app.badge.checkmark"
+            )
 
-                Button(action: { store.refresh() }) {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.6))
-                }
-                .buttonStyle(.plain)
-                .padding(.leading, 2)
-                .help("Refresh")
+            // Refresh button spins in-place while loading — no layout shift.
+            Button(action: { store.refresh() }) {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(store.isLoading ? 1.0 : 0.6))
+                    .rotationEffect(.degrees(store.isLoading ? 360 : 0))
+                    .animation(
+                        store.isLoading
+                            ? .linear(duration: 0.8).repeatForever(autoreverses: false)
+                            : .default,
+                        value: store.isLoading
+                    )
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, 2)
+            .help("Refresh")
 
                 // Open Dashboard button
                 Button(action: {
@@ -181,7 +184,6 @@ struct ContentView: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .help("More")
-            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

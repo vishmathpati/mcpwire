@@ -402,6 +402,7 @@ struct ProjectsView: View {
             .background(RoundedRectangle(cornerRadius: 9).fill(Color(NSColor.controlBackgroundColor)))
             .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color(NSColor.separatorColor).opacity(0.4), lineWidth: 0.5))
             .opacity(missing ? 0.75 : 1)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(isRenaming)

@@ -105,13 +105,14 @@ struct EditServerSheet: View {
                         label("Arguments (one per line)")
                         TextEditor(text: $argsText)
                             .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.primary)
+                            .scrollContentBackground(.hidden)
+                            .background(Color(NSColor.controlBackgroundColor))
                             .frame(height: 90)
-                            .padding(4)
-                            .background(Color(NSColor.textBackgroundColor))
                             .clipShape(RoundedRectangle(cornerRadius: 6))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 6)
-                                    .stroke(Color(NSColor.separatorColor).opacity(0.6), lineWidth: 0.5)
+                                    .stroke(Color(NSColor.separatorColor), lineWidth: 0.5)
                             )
                     }
                 } else {

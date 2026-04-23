@@ -5,20 +5,35 @@ import SwiftUI
 struct CoverageView: View {
     @EnvironmentObject var store: ServerStore
 
-    // Layout constants (fit 10 tools + name + cov column in 460px)
+    // Persisted comma-separated list of hidden tool IDs
+    @AppStorage("coverage.hiddenTools") private var hiddenToolsRaw: String = ""
+    @State private var showingColumnPicker = false
+
+    // Layout constants
     private let nameW:   CGFloat = 128
     private let cellW:   CGFloat = 26
     private let covW:    CGFloat = 36
     private let dotSize: CGFloat = 10
 
+    private var hiddenToolIDs: Set<String> {
+        Set(hiddenToolsRaw.split(separator: ",").map(String.init).filter { !$0.isEmpty })
+    }
+
+    private func setHidden(_ id: String, _ hidden: Bool) {
+        var set = hiddenToolIDs
+        if hidden { set.insert(id) } else { set.remove(id) }
+        hiddenToolsRaw = set.joined(separator: ",")
+    }
+
     var body: some View {
-        let detected   = store.detectedTools
-        let allNames   = store.allServerNames.filter { store.matches($0) }
-        let toolCount  = detected.count
+        let detected      = store.detectedTools
+        let visibleTools  = detected.filter { !hiddenToolIDs.contains($0.toolID) }
+        let allNames      = store.allServerNames.filter { store.matches($0) }
+        let totalCount    = detected.count
 
         VStack(spacing: 0) {
             // ── Legend ────────────────────────────────────────────────
-            legendSection(tools: detected)
+            legendSection(tools: visibleTools)
 
             Divider()
 
@@ -28,14 +43,14 @@ struct CoverageView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        headerRow(tools: detected, toolCount: toolCount)
+                        headerRow(tools: visibleTools, totalCount: totalCount)
                         Divider()
 
                         ForEach(Array(allNames.enumerated()), id: \.element) { idx, name in
                             dataRow(
                                 name: name,
-                                tools: detected,
-                                toolCount: toolCount,
+                                tools: visibleTools,
+                                totalCount: totalCount,
                                 idx: idx
                             )
                         }
@@ -57,14 +72,76 @@ struct CoverageView: View {
                     Text("not installed").font(.system(size: 10)).foregroundColor(.secondary)
                 }
                 Spacer()
-                Text("cov = apps it's installed on")
-                    .font(.system(size: 10))
-                    .foregroundColor(.secondary.opacity(0.6))
-                    .fixedSize()
+                // Column visibility picker
+                Button {
+                    showingColumnPicker.toggle()
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 10))
+                        Text("Columns")
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .foregroundColor(.accentColor)
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showingColumnPicker, arrowEdge: .bottom) {
+                    columnPicker(tools: detected)
+                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
         }
+    }
+
+    // MARK: Column picker popover
+
+    private func columnPicker(tools: [ToolSummary]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Show columns")
+                    .font(.system(size: 12, weight: .semibold))
+                Spacer()
+                Button("Show all") {
+                    hiddenToolsRaw = ""
+                }
+                .font(.system(size: 11))
+                .buttonStyle(.plain)
+                .foregroundColor(.accentColor)
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
+
+            Divider()
+
+            ForEach(tools) { tool in
+                let hidden = hiddenToolIDs.contains(tool.toolID)
+                Button {
+                    setHidden(tool.toolID, !hidden)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: hidden ? "square" : "checkmark.square.fill")
+                            .font(.system(size: 13))
+                            .foregroundColor(hidden ? .secondary : ToolPalette.color(for: tool.toolID))
+                        Circle()
+                            .fill(ToolPalette.color(for: tool.toolID))
+                            .frame(width: 7, height: 7)
+                        Text(tool.label)
+                            .font(.system(size: 12))
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background(hidden ? Color.clear : ToolPalette.color(for: tool.toolID).opacity(0.06))
+            }
+        }
+        .frame(width: 200)
+        .padding(.bottom, 6)
     }
 
     // MARK: - Legend (3 per row, fixed-size pills so labels never wrap)
@@ -113,7 +190,7 @@ struct CoverageView: View {
 
     // MARK: - Column header row
 
-    private func headerRow(tools: [ToolSummary], toolCount: Int) -> some View {
+    private func headerRow(tools: [ToolSummary], totalCount: Int) -> some View {
         HStack(spacing: 0) {
             Text("Server")
                 .font(.system(size: 10, weight: .medium))
@@ -144,12 +221,14 @@ struct CoverageView: View {
 
     private func dataRow(
         name: String,
-        tools: [ToolSummary],
-        toolCount: Int,
+        tools: [ToolSummary],   // visible tools only (for dots)
+        totalCount: Int,         // all detected tools (for cov fraction)
         idx: Int
     ) -> some View {
-        let covCount = tools.filter { $0.servers.contains { $0.name == name } }.count
-        let fraction = toolCount > 0 ? Double(covCount) / Double(toolCount) : 0.0
+        // cov counts ALL detected tools, not just visible ones, for honest numbers
+        let allDetected = store.detectedTools
+        let covCount    = allDetected.filter { $0.servers.contains { $0.name == name } }.count
+        let fraction    = totalCount > 0 ? Double(covCount) / Double(totalCount) : 0.0
         let covColor: Color = fraction >= 0.8 ? .green
                             : fraction >= 0.4 ? Color(red: 0.92, green: 0.66, blue: 0.12)
                             : .secondary
@@ -171,7 +250,7 @@ struct CoverageView: View {
                     .frame(width: cellW)
             }
 
-            Text("\(covCount)/\(toolCount)")
+            Text("\(covCount)/\(totalCount)")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(covColor)
                 .frame(width: covW, alignment: .trailing)
