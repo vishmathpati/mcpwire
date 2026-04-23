@@ -216,6 +216,26 @@ final class ServerStore: ObservableObject {
         }
     }
 
+    // MARK: - Toggle disabled
+
+    @discardableResult
+    func toggleServerDisabled(toolID: String, name: String, currently disabled: Bool) -> (ok: Bool, error: String?) {
+        guard ConfigWriter.supportsNativeWrite(toolID: toolID) else {
+            return (false, "This app's config format (TOML/YAML) doesn't support toggling.")
+        }
+        do {
+            if disabled {
+                try ConfigWriter.enableServer(toolID: toolID, name: name)
+            } else {
+                try ConfigWriter.disableServer(toolID: toolID, name: name)
+            }
+            refresh()
+            return (true, nil)
+        } catch {
+            return (false, error.localizedDescription)
+        }
+    }
+
     // MARK: - Undo
 
     /// Restores the most-recent backup for a tool's config file.

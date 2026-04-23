@@ -7,16 +7,39 @@ struct ByToolView: View {
     @EnvironmentObject var store: ServerStore
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 10) {
-                ForEach(store.detectedTools) { tool in
-                    ToolCard(tool: tool)
+        VStack(spacing: 0) {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 10) {
+                    ForEach(store.detectedTools) { tool in
+                        ToolCard(tool: tool)
+                    }
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 12)
+
+            // Health legend
+            Divider()
+            HStack(spacing: 14) {
+                healthLegendItem(color: .green,   label: "Reachable")
+                healthLegendItem(color: .orange,  label: "Degraded")
+                healthLegendItem(color: .red,     label: "Unreachable")
+                healthLegendItem(color: .secondary.opacity(0.4), label: "Not checked")
+                Spacer()
+                Text("Hover a dot for details")
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary.opacity(0.5))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
         }
-        .frame(maxHeight: 460)
+    }
+
+    private func healthLegendItem(color: Color, label: String) -> some View {
+        HStack(spacing: 4) {
+            Circle().fill(color).frame(width: 6, height: 6)
+            Text(label).font(.system(size: 9)).foregroundColor(.secondary)
+        }
     }
 }
 
@@ -69,13 +92,20 @@ struct ToolCard: View {
                 }
             }) {
                 HStack(spacing: 11) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(accent.opacity(0.16))
+                    if let nsImg = ToolPalette.appImage(for: tool.toolID) {
+                        Image(nsImage: nsImg)
+                            .resizable()
                             .frame(width: 36, height: 36)
-                        Image(systemName: icon)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(accent)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    } else {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(accent.opacity(0.16))
+                                .frame(width: 36, height: 36)
+                            Image(systemName: icon)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(accent)
+                        }
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text(tool.label)
@@ -251,13 +281,15 @@ struct ServerRow: View {
     @State private var errorMessage: String? = nil
     @State private var showingError = false
     @State private var removing = false
+    @State private var toggling = false
 
     // Delete-everywhere confirm
     @State private var confirmingEverywhere = false
 
-    // Health
+    // Health — starts as .unknown, checked on appear and every 60 s
     @State private var health: HealthStatus = .unknown
     @State private var checkingHealth = false
+    private let healthTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     private var kindLabel: String {
         switch server.transport {
@@ -287,14 +319,31 @@ struct ServerRow: View {
 
     var body: some View {
         HStack(spacing: 9) {
-            Circle()
-                .fill(accent.opacity(0.75))
-                .frame(width: 6, height: 6)
+            // Toggle: on/off switch
+            if toggling {
+                ProgressView().scaleEffect(0.5).frame(width: 28, height: 18)
+            } else {
+                Toggle("", isOn: Binding(
+                    get: { !server.isDisabled },
+                    set: { _ in performToggle() }
+                ))
+                .toggleStyle(.switch)
+                .scaleEffect(0.65)
+                .frame(width: 28)
+                .disabled(!nativeSupported)
+                .help(server.isDisabled
+                      ? "Enable: adds back to \(toolLabel)"
+                      : "Disable: removes from \(toolLabel) without deleting")
+            }
+
+            // Health dot (always visible after first check)
+            healthDotInline
 
             Text(server.name)
                 .font(.system(size: 12.5, weight: .medium))
-                .foregroundColor(.primary)
+                .foregroundColor(server.isDisabled ? .secondary : .primary)
                 .lineLimit(1)
+                .strikethrough(server.isDisabled, color: .secondary)
 
             HStack(spacing: 3) {
                 Image(systemName: kindIcon)
@@ -307,8 +356,6 @@ struct ServerRow: View {
             .padding(.vertical, 2)
             .background(kindColor.opacity(0.12))
             .clipShape(Capsule())
-
-            healthDot
 
             Spacer(minLength: 0)
 
@@ -403,25 +450,30 @@ struct ServerRow: View {
         } message: {
             Text(errorMessage ?? "Unknown error.")
         }
+        .onAppear {
+            Task { await runHealthCheck() }
+        }
+        .onReceive(healthTimer) { _ in
+            Task { await runHealthCheck() }
+        }
     }
 
-    // MARK: Health indicator
+    // MARK: Health indicators
 
+    // Inline dot shown at the left of the row (replaces the old status-only dot).
     @ViewBuilder
-    private var healthDot: some View {
-        let color: Color = {
-            switch health {
-            case .ok:       return .green
-            case .warn:     return .orange
-            case .fail:     return .red
-            case .unknown:  return .clear
-            }
-        }()
+    private var healthDotInline: some View {
         if checkingHealth {
-            ProgressView().scaleEffect(0.35).frame(width: 10, height: 10)
-        } else if case .unknown = health {
-            EmptyView()
+            ProgressView().scaleEffect(0.35).frame(width: 8, height: 8)
         } else {
+            let color: Color = {
+                switch health {
+                case .ok:      return .green
+                case .warn:    return .orange
+                case .fail:    return .red
+                case .unknown: return Color.secondary.opacity(0.3)
+                }
+            }()
             Circle()
                 .fill(color)
                 .frame(width: 7, height: 7)
@@ -431,10 +483,10 @@ struct ServerRow: View {
 
     private var healthTooltip: String {
         switch health {
-        case .ok(let d):   return "OK — \(d)"
-        case .warn(let d): return "Warning — \(d)"
-        case .fail(let d): return "Failed — \(d)"
-        case .unknown:     return ""
+        case .ok(let d):   return "Reachable — \(d)"
+        case .warn(let d): return "Degraded — \(d)"
+        case .fail(let d): return "Unreachable — \(d)"
+        case .unknown:     return "Health not yet checked"
         }
     }
 
@@ -465,9 +517,22 @@ struct ServerRow: View {
     }
 
     private func runHealthCheck() async {
+        guard !checkingHealth else { return }
         checkingHealth = true
         health = await HealthCheck.check(server)
         checkingHealth = false
+    }
+
+    private func performToggle() {
+        toggling = true
+        Task { @MainActor in
+            let result = store.toggleServerDisabled(toolID: toolID, name: server.name, currently: server.isDisabled)
+            toggling = false
+            if !result.ok {
+                errorMessage = result.error
+                showingError = true
+            }
+        }
     }
 
     // MARK: Copy install link

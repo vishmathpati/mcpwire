@@ -87,6 +87,35 @@ struct DashboardRootView: View {
                 .environmentObject(overlay)
                 .frame(minWidth: 500, minHeight: 400)
         }
+        .sheet(isPresented: Binding(
+            get: { if case .editServer = overlay.overlay { return true }; return false },
+            set: { if !$0 { overlay.dismiss() } }
+        )) {
+            if case .editServer(let toolID, let toolLabel, let serverName) = overlay.overlay {
+                EditServerSheet(
+                    toolID: toolID, toolLabel: toolLabel,
+                    serverName: serverName, projectRoot: nil,
+                    onClose: { overlay.dismiss() }
+                )
+                .environmentObject(store)
+                .frame(minWidth: 440, minHeight: 420)
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { if case .copyToApps = overlay.overlay { return true }; return false },
+            set: { if !$0 { overlay.dismiss() } }
+        )) {
+            if case .copyToApps(let toolID, let toolLabel, let serverName) = overlay.overlay {
+                CopyToAppsSheet(
+                    serverName: serverName,
+                    sourceToolID: toolID,
+                    sourceToolLabel: toolLabel,
+                    onClose: { overlay.dismiss() }
+                )
+                .environmentObject(store)
+                .frame(minWidth: 420, minHeight: 320)
+            }
+        }
     }
 
     // MARK: Sidebar
@@ -190,6 +219,7 @@ struct DashboardRootView: View {
                 : Color.clear
             )
             .clipShape(RoundedRectangle(cornerRadius: 7))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

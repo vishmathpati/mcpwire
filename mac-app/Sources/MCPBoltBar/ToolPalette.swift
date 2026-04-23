@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 // MARK: - Per-tool visual identity (color + SF Symbol)
 
@@ -65,5 +66,29 @@ struct ToolPalette {
 
     static func icon(for toolID: String) -> String {
         map[toolID]?.icon ?? "app.fill"
+    }
+
+    // Returns the real app icon from NSWorkspace if the app is installed,
+    // nil for CLI-only tools or apps that aren't present on this Mac.
+    static func appImage(for toolID: String) -> NSImage? {
+        let candidates: [String: [String]] = [
+            "claude-desktop": ["/Applications/Claude.app"],
+            "cursor":         ["/Applications/Cursor.app"],
+            "vscode":         ["/Applications/Visual Studio Code.app",
+                               "/Applications/VSCode.app"],
+            "windsurf":       ["/Applications/Windsurf.app"],
+            "zed":            ["/Applications/Zed.app", "/Applications/Zed Preview.app"],
+            "roo":            ["/Applications/Roo.app"],
+            "continue":       ["/Applications/Continue.app"],
+            "cline":          ["/Applications/Cline.app"],
+        ]
+        guard let paths = candidates[toolID] else { return nil }
+        let fm = FileManager.default
+        for path in paths {
+            if fm.fileExists(atPath: path) {
+                return NSWorkspace.shared.icon(forFile: path)
+            }
+        }
+        return nil
     }
 }

@@ -9,6 +9,7 @@ struct ServerEntry: Identifiable, Hashable {
     let command: String?
     let args: [String]
     let url: String?
+    var isDisabled: Bool = false
 
     var detail: String {
         if transport == "stdio" {

@@ -106,10 +106,16 @@ final class ConfigReader {
         let stripped = stripJsonComments(raw)
         guard
             let data = stripped.data(using: .utf8),
-            let obj  = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let dict = obj[key] as? [String: Any]
+            let obj  = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return [] }
-        return parseServerDict(dict)
+        var result: [ServerEntry] = []
+        if let dict = obj[key] as? [String: Any] {
+            result += parseServerDict(dict, isDisabled: false)
+        }
+        if let disabled = obj["\(key)_disabled"] as? [String: Any] {
+            result += parseServerDict(disabled, isDisabled: true)
+        }
+        return result.sorted { $0.name.lowercased() < $1.name.lowercased() }
     }
 
     private func readJsonNestedServers(path: String, keys: [String]) -> [ServerEntry] {
@@ -128,7 +134,7 @@ final class ConfigReader {
         return parseServerDict(dict)
     }
 
-    private func parseServerDict(_ dict: [String: Any]) -> [ServerEntry] {
+    private func parseServerDict(_ dict: [String: Any], isDisabled: Bool = false) -> [ServerEntry] {
         dict.compactMap { name, value in
             guard let props = value as? [String: Any] else { return nil }
             let command = props["command"] as? String
@@ -138,9 +144,8 @@ final class ConfigReader {
             if let t = props["type"] as? String { transport = t }
             else if url != nil { transport = "http" }
             else { transport = "stdio" }
-            return ServerEntry(name: name, transport: transport, command: command, args: args, url: url)
+            return ServerEntry(name: name, transport: transport, command: command, args: args, url: url, isDisabled: isDisabled)
         }
-        .sorted { $0.name.lowercased() < $1.name.lowercased() }
     }
 
     // MARK: - TOML (Codex: [mcp_servers.name] sections)

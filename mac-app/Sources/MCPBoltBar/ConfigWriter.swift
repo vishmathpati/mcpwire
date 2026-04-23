@@ -452,6 +452,41 @@ enum ConfigWriter {
         try backupAndWrite(path: path, root: up)
     }
 
+    // MARK: - Enable / disable (moves between mcpServers and mcpServers_disabled)
+
+    static func disableServer(toolID: String, name: String) throws {
+        guard let spec = ToolSpecs.spec(for: toolID),
+              case .json(let key) = spec.kind else {
+            throw WriteError.unsupportedFormat(toolID)
+        }
+        var root = loadJsonRoot(path: spec.path)
+        guard var enabled = root[key] as? [String: Any],
+              let config = enabled[name] else { return }
+        enabled.removeValue(forKey: name)
+        root[key] = enabled
+        var disabled = root["\(key)_disabled"] as? [String: Any] ?? [:]
+        disabled[name] = config
+        root["\(key)_disabled"] = disabled
+        try backupAndWrite(path: spec.path, root: root)
+    }
+
+    static func enableServer(toolID: String, name: String) throws {
+        guard let spec = ToolSpecs.spec(for: toolID),
+              case .json(let key) = spec.kind else {
+            throw WriteError.unsupportedFormat(toolID)
+        }
+        var root = loadJsonRoot(path: spec.path)
+        guard var disabled = root["\(key)_disabled"] as? [String: Any],
+              let config = disabled[name] else { return }
+        disabled.removeValue(forKey: name)
+        if disabled.isEmpty { root.removeValue(forKey: "\(key)_disabled") }
+        else { root["\(key)_disabled"] = disabled }
+        var enabled = root[key] as? [String: Any] ?? [:]
+        enabled[name] = config
+        root[key] = enabled
+        try backupAndWrite(path: spec.path, root: root)
+    }
+
     /// Removes a server from the tool's config (user scope). Throws on failure.
     static func removeServer(
         toolID: String,
