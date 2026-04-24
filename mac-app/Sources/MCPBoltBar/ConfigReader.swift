@@ -169,7 +169,8 @@ final class ConfigReader {
             if let t = props["type"] as? String { transport = t }
             else if url != nil { transport = "http" }
             else { transport = "stdio" }
-            servers.append(ServerEntry(name: name, transport: transport, command: command, args: args, url: url))
+            let isDisabled = (props["enabled"] as? String) == "false"
+            servers.append(ServerEntry(name: name, transport: transport, command: command, args: args, url: url, isDisabled: isDisabled))
             props = [:]
         }
 

@@ -359,7 +359,7 @@ struct ImportSheet: View {
                                         .foregroundColor(.accentColor)
                                 }
                             }
-                            Text("Only Claude Code, Cursor, VS Code, and Roo support project configs.")
+                            Text("Only Claude Code, Cursor, VS Code, Roo, and Codex support project configs.")
                                 .font(.system(size: 10))
                                 .foregroundColor(.secondary)
                         }

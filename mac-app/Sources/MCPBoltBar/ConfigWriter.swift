@@ -7,7 +7,7 @@ import Foundation
 enum ConfigKind {
     case json(key: String)                  // { mcpServers: { ... } }   or servers
     case jsonNested(keys: [String])         // { ..., context_servers: {...} }
-    case toml                                // [mcp_servers.name] sections
+    case toml(key: String)                   // [<key>.name] sections
     case yaml                                // mcpServers: array
 }
 
@@ -57,6 +57,10 @@ enum ToolSpecs {
                 return .init(id: toolID,
                              path: "\(root)/.mcp.json",
                              kind: .json(key: "mcpServers"))
+            case "codex":
+                return .init(id: toolID,
+                             path: "\(root)/.codex/config.toml",
+                             kind: .toml(key: "mcp_servers"))
             default:
                 return nil
             }
@@ -99,7 +103,7 @@ enum ToolSpecs {
         case "codex":
             return .init(id: toolID,
                          path: "\(home)/.codex/config.toml",
-                         kind: .toml)
+                         kind: .toml(key: "mcp_servers"))
         case "continue":
             return .init(id: toolID,
                          path: "\(home)/.continue/config.yaml",
@@ -121,7 +125,7 @@ enum ToolSpecs {
     }
 
     /// Tool IDs that support project scope.
-    static let projectScopedTools: Set<String> = ["cursor", "vscode", "roo", "claude-code"]
+    static let projectScopedTools: Set<String> = ["cursor", "vscode", "roo", "claude-code", "codex"]
 }
 
 enum ConfigWriter {
@@ -144,8 +148,8 @@ enum ConfigWriter {
     static func supportsNativeWrite(toolID: String) -> Bool {
         guard let spec = ToolSpecs.spec(for: toolID) else { return false }
         switch spec.kind {
-        case .json, .jsonNested: return true
-        case .toml, .yaml:       return false
+        case .json, .jsonNested, .toml: return true
+        case .yaml:                     return false
         }
     }
 
@@ -182,7 +186,9 @@ enum ConfigWriter {
             try writeJson(path: spec.path, key: key, name: name, config: shaped)
         case .jsonNested(let keys):
             try writeJsonNested(path: spec.path, keys: keys, name: name, config: shaped)
-        case .toml, .yaml:
+        case .toml(let key):
+            try writeToml(path: spec.path, tableKey: key, name: name, config: shaped)
+        case .yaml:
             throw WriteError.unsupportedFormat(toolID)
         }
     }
@@ -238,8 +244,12 @@ enum ConfigWriter {
                 up = parent
             }
             root = up
-        case .toml, .yaml:
-            return (before, "(TOML / YAML preview not supported)")
+        case .toml(let key):
+            let section = serverToTomlSection(tableKey: key, name: name, config: shaped)
+            let after = upsertTomlSection(toml: before, tableKey: key, name: name, section: section)
+            return (before, after)
+        case .yaml:
+            return (before, "(YAML preview not supported)")
         }
 
         let data = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted])
@@ -279,7 +289,13 @@ enum ConfigWriter {
             }
             raw = cursor[name] as? [String: Any]
 
-        case .toml, .yaml:
+        case .toml(let key):
+            let all = parseTomlSections(
+                (try? String(contentsOfFile: spec.path, encoding: .utf8)) ?? "",
+                tableKey: key)
+            raw = all[name]
+
+        case .yaml:
             return nil
         }
 
@@ -311,7 +327,11 @@ enum ConfigWriter {
             var cursor: [String: Any] = loadJsonRoot(path: spec.path)
             for k in keys { cursor = (cursor[k] as? [String: Any]) ?? [:] }
             dict = cursor
-        case .toml, .yaml:
+        case .toml(let key):
+            let raw = (try? String(contentsOfFile: spec.path, encoding: .utf8)) ?? ""
+            return parseTomlSections(raw, tableKey: key)
+
+        case .yaml:
             return [:]
         }
 
@@ -388,7 +408,9 @@ enum ConfigWriter {
             try updateEnvJson(path: spec.path, key: key, name: name, env: env)
         case .jsonNested(let keys):
             try updateEnvJsonNested(path: spec.path, keys: keys, name: name, env: env)
-        case .toml, .yaml:
+        case .toml(let key):
+            try updateEnvToml(path: spec.path, tableKey: key, name: name, env: env)
+        case .yaml:
             throw WriteError.unsupportedFormat(toolID)
         }
     }
@@ -455,36 +477,52 @@ enum ConfigWriter {
     // MARK: - Enable / disable (moves between mcpServers and mcpServers_disabled)
 
     static func disableServer(toolID: String, name: String) throws {
-        guard let spec = ToolSpecs.spec(for: toolID),
-              case .json(let key) = spec.kind else {
+        guard let spec = ToolSpecs.spec(for: toolID) else {
             throw WriteError.unsupportedFormat(toolID)
         }
-        var root = loadJsonRoot(path: spec.path)
-        guard var enabled = root[key] as? [String: Any],
-              let config = enabled[name] else { return }
-        enabled.removeValue(forKey: name)
-        root[key] = enabled
-        var disabled = root["\(key)_disabled"] as? [String: Any] ?? [:]
-        disabled[name] = config
-        root["\(key)_disabled"] = disabled
-        try backupAndWrite(path: spec.path, root: root)
+        switch spec.kind {
+        case .json(let key):
+            var root = loadJsonRoot(path: spec.path)
+            guard var enabled = root[key] as? [String: Any],
+                  let config = enabled[name] else { return }
+            enabled.removeValue(forKey: name)
+            root[key] = enabled
+            var disabled = root["\(key)_disabled"] as? [String: Any] ?? [:]
+            disabled[name] = config
+            root["\(key)_disabled"] = disabled
+            try backupAndWrite(path: spec.path, root: root)
+        case .jsonNested:
+            throw WriteError.unsupportedFormat(toolID)
+        case .toml(let key):
+            try setTomlEnabled(path: spec.path, tableKey: key, name: name, enabled: false)
+        case .yaml:
+            throw WriteError.unsupportedFormat(toolID)
+        }
     }
 
     static func enableServer(toolID: String, name: String) throws {
-        guard let spec = ToolSpecs.spec(for: toolID),
-              case .json(let key) = spec.kind else {
+        guard let spec = ToolSpecs.spec(for: toolID) else {
             throw WriteError.unsupportedFormat(toolID)
         }
-        var root = loadJsonRoot(path: spec.path)
-        guard var disabled = root["\(key)_disabled"] as? [String: Any],
-              let config = disabled[name] else { return }
-        disabled.removeValue(forKey: name)
-        if disabled.isEmpty { root.removeValue(forKey: "\(key)_disabled") }
-        else { root["\(key)_disabled"] = disabled }
-        var enabled = root[key] as? [String: Any] ?? [:]
-        enabled[name] = config
-        root[key] = enabled
-        try backupAndWrite(path: spec.path, root: root)
+        switch spec.kind {
+        case .json(let key):
+            var root = loadJsonRoot(path: spec.path)
+            guard var disabled = root["\(key)_disabled"] as? [String: Any],
+                  let config = disabled[name] else { return }
+            disabled.removeValue(forKey: name)
+            if disabled.isEmpty { root.removeValue(forKey: "\(key)_disabled") }
+            else { root["\(key)_disabled"] = disabled }
+            var enabled = root[key] as? [String: Any] ?? [:]
+            enabled[name] = config
+            root[key] = enabled
+            try backupAndWrite(path: spec.path, root: root)
+        case .jsonNested:
+            throw WriteError.unsupportedFormat(toolID)
+        case .toml(let key):
+            try setTomlEnabled(path: spec.path, tableKey: key, name: name, enabled: true)
+        case .yaml:
+            throw WriteError.unsupportedFormat(toolID)
+        }
     }
 
     /// Removes a server from the tool's config (user scope). Throws on failure.
@@ -512,7 +550,9 @@ enum ConfigWriter {
             try removeJson(path: spec.path, key: key, name: name)
         case .jsonNested(let keys):
             try removeJsonNested(path: spec.path, keys: keys, name: name)
-        case .toml, .yaml:
+        case .toml(let key):
+            try removeToml(path: spec.path, tableKey: key, name: name)
+        case .yaml:
             throw WriteError.unsupportedFormat(toolID)
         }
     }
@@ -724,6 +764,391 @@ enum ConfigWriter {
             atPath: dir,
             withIntermediateDirectories: true
         )
+    }
+
+    // MARK: - TOML writers / readers (Codex: [mcp_servers.<name>] sections)
+
+    /// Write (or replace) a [<tableKey>.<name>] section in a TOML file.
+    private static func writeToml(
+        path: String,
+        tableKey: String,
+        name: String,
+        config: [String: Any]
+    ) throws {
+        ensureParent(of: path)
+        let existing = (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
+        let section  = serverToTomlSection(tableKey: tableKey, name: name, config: config)
+        let updated  = upsertTomlSection(toml: existing, tableKey: tableKey, name: name, section: section)
+        try tomlBackupAndWrite(path: path, existing: existing, updated: updated)
+    }
+
+    /// Remove a [<tableKey>.<name>] section from a TOML file.
+    private static func removeToml(
+        path: String,
+        tableKey: String,
+        name: String
+    ) throws {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: path) else { return }
+        guard let existing = try? String(contentsOfFile: path, encoding: .utf8) else {
+            throw WriteError.readFailure("Could not read \(path)")
+        }
+        let updated = removeTomlSection(toml: existing, tableKey: tableKey, name: name)
+        if updated == existing { return }
+        try tomlBackupAndWrite(path: path, existing: existing, updated: updated)
+    }
+
+    /// Set or clear `enabled = false` in a TOML server section (toggle support).
+    private static func setTomlEnabled(
+        path: String,
+        tableKey: String,
+        name: String,
+        enabled: Bool
+    ) throws {
+        guard let existing = try? String(contentsOfFile: path, encoding: .utf8) else {
+            throw WriteError.readFailure("Could not read \(path)")
+        }
+        var servers = parseTomlSections(existing, tableKey: tableKey)
+        guard var cfg = servers[name] else {
+            throw WriteError.readFailure("Server '\(name)' not found in \(path)")
+        }
+        if enabled {
+            cfg.removeValue(forKey: "enabled")
+        } else {
+            cfg["enabled"] = false
+        }
+        let section = serverToTomlSection(tableKey: tableKey, name: name, config: cfg)
+        let updated = upsertTomlSection(toml: existing, tableKey: tableKey, name: name, section: section)
+        try tomlBackupAndWrite(path: path, existing: existing, updated: updated)
+    }
+
+    /// Update env keys in a TOML server section (used by NextSteps env-key form).
+    private static func updateEnvToml(
+        path: String,
+        tableKey: String,
+        name: String,
+        env: [String: String]
+    ) throws {
+        guard let existing = try? String(contentsOfFile: path, encoding: .utf8) else {
+            throw WriteError.readFailure("Could not read \(path)")
+        }
+        var servers = parseTomlSections(existing, tableKey: tableKey)
+        guard var cfg = servers[name] else {
+            throw WriteError.readFailure("Server '\(name)' not found in \(path)")
+        }
+        var currentEnv = (cfg["env"] as? [String: Any]) ?? [:]
+        for (k, v) in env {
+            if v.isEmpty { currentEnv.removeValue(forKey: k) }
+            else         { currentEnv[k] = v }
+        }
+        if currentEnv.isEmpty { cfg.removeValue(forKey: "env") }
+        else                  { cfg["env"] = currentEnv }
+        let section = serverToTomlSection(tableKey: tableKey, name: name, config: cfg)
+        let updated = upsertTomlSection(toml: existing, tableKey: tableKey, name: name, section: section)
+        try tomlBackupAndWrite(path: path, existing: existing, updated: updated)
+    }
+
+    // MARK: - TOML text helpers
+
+    /// Serialise a claude-shape server dict into TOML section text.
+    private static func serverToTomlSection(tableKey: String, name: String, config: [String: Any]) -> String {
+        var lines = ["[\(tableKey).\(name)]"]
+        if let enabled = config["enabled"] as? Bool, !enabled {
+            lines.append("enabled = false")
+        }
+        if let url = config["url"] as? String {
+            lines.append("url = \(tomlStr(url))")
+            if let h = config["headers"] as? [String: Any], !h.isEmpty {
+                let pairs = h.sorted { $0.key < $1.key }
+                    .map { "\(tomlKey($0.key)) = \(tomlStr($0.value as? String ?? ""))" }
+                    .joined(separator: ", ")
+                lines.append("http_headers = { \(pairs) }")
+            }
+        } else {
+            if let cmd = config["command"] as? String, !cmd.isEmpty {
+                lines.append("command = \(tomlStr(cmd))")
+            }
+            if let args = config["args"] as? [String], !args.isEmpty {
+                lines.append("args = [\(args.map { tomlStr($0) }.joined(separator: ", "))]")
+            }
+            if let env = config["env"] as? [String: Any], !env.isEmpty {
+                let pairs = env.sorted { $0.key < $1.key }
+                    .map { "\(tomlKey($0.key)) = \(tomlStr($0.value as? String ?? ""))" }
+                    .joined(separator: ", ")
+                lines.append("env = { \(pairs) }")
+            }
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func tomlStr(_ s: String) -> String {
+        let e = s.replacingOccurrences(of: "\\", with: "\\\\")
+                 .replacingOccurrences(of: "\"", with: "\\\"")
+                 .replacingOccurrences(of: "\n", with: "\\n")
+                 .replacingOccurrences(of: "\t", with: "\\t")
+        return "\"\(e)\""
+    }
+
+    private static func tomlKey(_ s: String) -> String {
+        let isBare = s.unicodeScalars.allSatisfy {
+            ($0.value >= 65 && $0.value <= 90) ||
+            ($0.value >= 97 && $0.value <= 122) ||
+            ($0.value >= 48 && $0.value <= 57) ||
+            $0.value == 45 || $0.value == 95
+        }
+        return isBare ? s : tomlStr(s)
+    }
+
+    /// Insert or replace a [<tableKey>.<name>] section in TOML text.
+    private static func upsertTomlSection(
+        toml: String,
+        tableKey: String,
+        name: String,
+        section: String
+    ) -> String {
+        let header = "[\(tableKey).\(name)]"
+        let lines = toml.components(separatedBy: "\n")
+        var start: Int? = nil
+        var end = lines.count
+
+        for (i, line) in lines.enumerated() {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            if t == header {
+                start = i
+            } else if start != nil && t.hasPrefix("[") && !t.hasPrefix("#") {
+                end = i
+                break
+            }
+        }
+
+        let newLines = section.components(separatedBy: "\n")
+        if let s = start {
+            var result = Array(lines[0..<s])
+            result += newLines
+            let tail = Array(lines[end...])
+            if !tail.isEmpty && !tail[0].trimmingCharacters(in: .whitespaces).isEmpty {
+                result.append("")
+            }
+            result += tail
+            return result.joined(separator: "\n")
+        } else {
+            var result = toml
+            if !result.hasSuffix("\n") { result += "\n" }
+            if !result.hasSuffix("\n\n") { result += "\n" }
+            result += newLines.joined(separator: "\n") + "\n"
+            return result
+        }
+    }
+
+    /// Delete a [<tableKey>.<name>] section (and its preceding blank lines) from TOML text.
+    private static func removeTomlSection(toml: String, tableKey: String, name: String) -> String {
+        let header = "[\(tableKey).\(name)]"
+        var lines = toml.components(separatedBy: "\n")
+        var start: Int? = nil
+        var end = lines.count
+
+        for (i, line) in lines.enumerated() {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            if t == header {
+                start = i
+            } else if start != nil && t.hasPrefix("[") && !t.hasPrefix("#") {
+                end = i
+                break
+            }
+        }
+
+        guard var s = start else { return toml }
+        // Pull preceding blank lines into the deletion range
+        while s > 0 && lines[s - 1].trimmingCharacters(in: .whitespaces).isEmpty { s -= 1 }
+        lines.removeSubrange(s..<end)
+        var result = lines.joined(separator: "\n")
+        while result.hasSuffix("\n\n\n") { result = String(result.dropLast()) }
+        return result
+    }
+
+    /// Parse all [<tableKey>.*] sections from TOML text into a [name: fields] dict.
+    private static func parseTomlSections(
+        _ toml: String,
+        tableKey: String
+    ) -> [String: [String: Any]] {
+        var result: [String: [String: Any]] = [:]
+        let prefix = "\(tableKey)."
+        var currentName: String? = nil
+        var currentFields: [String: Any] = [:]
+
+        func flush() {
+            if let n = currentName, !currentFields.isEmpty { result[n] = currentFields }
+        }
+
+        for line in toml.components(separatedBy: "\n") {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            if t.isEmpty || t.hasPrefix("#") { continue }
+
+            if t.hasPrefix("[") && !t.hasPrefix("[[") {
+                flush()
+                currentName = nil
+                currentFields = [:]
+                if t.hasSuffix("]"),
+                   let closeIdx = t.lastIndex(of: "]") {
+                    let inner = String(t[t.index(after: t.startIndex)..<closeIdx])
+                    if inner.hasPrefix(prefix) {
+                        currentName = String(inner.dropFirst(prefix.count))
+                    }
+                }
+                continue
+            }
+
+            guard currentName != nil else { continue }
+
+            if let eqIdx = t.firstIndex(of: "=") {
+                let k = String(t[t.startIndex..<eqIdx]).trimmingCharacters(in: .whitespaces)
+                let v = String(t[t.index(after: eqIdx)...]).trimmingCharacters(in: .whitespaces)
+                if !k.isEmpty, let parsed = parseTomlVal(v) {
+                    currentFields[k] = parsed
+                }
+            }
+        }
+
+        flush()
+        return result
+    }
+
+    private static func parseTomlVal(_ s: String) -> Any? {
+        if s == "true"  { return true  }
+        if s == "false" { return false }
+        if let n = Int(s) { return n }
+
+        if s.hasPrefix("\"") {
+            var r = ""
+            var i = s.index(after: s.startIndex)
+            while i < s.endIndex {
+                let c = s[i]
+                if c == "\\" {
+                    let nx = s.index(after: i)
+                    if nx < s.endIndex {
+                        switch s[nx] {
+                        case "\"": r.append("\"")
+                        case "\\": r.append("\\")
+                        case "n":  r.append("\n")
+                        case "t":  r.append("\t")
+                        default:   r.append(s[nx])
+                        }
+                        i = s.index(after: nx)
+                    } else { i = s.index(after: i) }
+                } else if c == "\"" { break }
+                else { r.append(c); i = s.index(after: i) }
+            }
+            return r
+        }
+
+        if s.hasPrefix("[") && s.hasSuffix("]") {
+            return parseTomlArray(String(s.dropFirst().dropLast()))
+        }
+        if s.hasPrefix("{") && s.hasSuffix("}") {
+            return parseTomlInlineTable(String(s.dropFirst().dropLast()))
+        }
+        return nil
+    }
+
+    private static func parseTomlArray(_ s: String) -> [String] {
+        var result: [String] = []
+        var rem = s.trimmingCharacters(in: .whitespaces)
+        while !rem.isEmpty {
+            rem = rem.trimmingCharacters(in: .whitespaces)
+            if rem.isEmpty { break }
+            if rem.hasPrefix("\"") {
+                var val = ""
+                var i = rem.index(after: rem.startIndex)
+                var found = false
+                while i < rem.endIndex {
+                    let c = rem[i]
+                    if c == "\\" {
+                        let nx = rem.index(after: i)
+                        if nx < rem.endIndex { val.append(rem[nx]); i = rem.index(after: nx) }
+                        else { i = rem.index(after: i) }
+                    } else if c == "\"" { i = rem.index(after: i); found = true; break }
+                    else { val.append(c); i = rem.index(after: i) }
+                }
+                if found {
+                    result.append(val)
+                    rem = String(rem[i...]).trimmingCharacters(in: .whitespaces)
+                    if rem.hasPrefix(",") { rem = String(rem.dropFirst()) }
+                } else { break }
+            } else {
+                if let ci = rem.firstIndex(of: ",") {
+                    let elem = String(rem[rem.startIndex..<ci]).trimmingCharacters(in: .whitespaces)
+                    if !elem.isEmpty { result.append(elem) }
+                    rem = String(rem[rem.index(after: ci)...])
+                } else {
+                    let elem = rem.trimmingCharacters(in: .whitespaces)
+                    if !elem.isEmpty { result.append(elem) }
+                    break
+                }
+            }
+        }
+        return result
+    }
+
+    private static func parseTomlInlineTable(_ s: String) -> [String: String] {
+        var result: [String: String] = [:]
+        var rem = s.trimmingCharacters(in: .whitespaces)
+        while !rem.isEmpty {
+            guard let eqIdx = rem.firstIndex(of: "=") else { break }
+            var key = String(rem[rem.startIndex..<eqIdx]).trimmingCharacters(in: .whitespaces)
+            if key.hasPrefix("\"") && key.hasSuffix("\"") && key.count >= 2 {
+                key = String(key.dropFirst().dropLast())
+            }
+            rem = String(rem[rem.index(after: eqIdx)...]).trimmingCharacters(in: .whitespaces)
+            if rem.hasPrefix("\"") {
+                var val = ""
+                var i = rem.index(after: rem.startIndex)
+                var found = false
+                while i < rem.endIndex {
+                    let c = rem[i]
+                    if c == "\\" {
+                        let nx = rem.index(after: i)
+                        if nx < rem.endIndex { val.append(rem[nx]); i = rem.index(after: nx) }
+                        else { i = rem.index(after: i) }
+                    } else if c == "\"" { i = rem.index(after: i); found = true; break }
+                    else { val.append(c); i = rem.index(after: i) }
+                }
+                if found {
+                    result[key] = val
+                    rem = String(rem[i...]).trimmingCharacters(in: .whitespaces)
+                    if rem.hasPrefix(",") { rem = String(rem.dropFirst()).trimmingCharacters(in: .whitespaces) }
+                } else { break }
+            } else {
+                if let ci = rem.firstIndex(of: ",") {
+                    result[key] = String(rem[rem.startIndex..<ci]).trimmingCharacters(in: .whitespaces)
+                    rem = String(rem[rem.index(after: ci)...]).trimmingCharacters(in: .whitespaces)
+                } else {
+                    result[key] = rem.trimmingCharacters(in: .whitespaces)
+                    break
+                }
+            }
+        }
+        return result
+    }
+
+    /// Backup + atomic write for a TOML file (string-based, not JSON serialisation).
+    private static func tomlBackupAndWrite(path: String, existing: String, updated: String) throws {
+        let fm = FileManager.default
+        if fm.fileExists(atPath: path) {
+            let stamp = backupStamp()
+            try? existing.data(using: .utf8)?.write(
+                to: URL(fileURLWithPath: "\(path).bak.\(stamp)"), options: [.atomic])
+            pruneBackups(forPath: path)
+            let legacy = path + ".bak"
+            if fm.fileExists(atPath: legacy) { try? fm.removeItem(atPath: legacy) }
+        }
+        guard let data = updated.data(using: .utf8) else {
+            throw WriteError.writeFailure("Failed to encode TOML as UTF-8")
+        }
+        do {
+            try data.write(to: URL(fileURLWithPath: path), options: [.atomic])
+        } catch {
+            throw WriteError.writeFailure(error.localizedDescription)
+        }
     }
 
     // MARK: - JSONC comment stripper (duplicated from reader to avoid coupling)
