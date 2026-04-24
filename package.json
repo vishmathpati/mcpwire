@@ -14,8 +14,9 @@
   },
   "scripts": {
     "dev": "bun src/cli/index.ts",
-    "build": "bun build src/cli/index.ts --outdir dist/cli --target node --minify",
-    "prepublishOnly": "bun run build",
+    "build": "npx esbuild src/cli/index.ts --outdir=dist/cli --platform=node --bundle --minify --format=esm",
+    "build:bun": "bun build src/cli/index.ts --outdir dist/cli --target node --minify",
+    "prepublishOnly": "npm run build",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -26,6 +27,7 @@
   "devDependencies": {
     "@types/bun": "latest",
     "@types/node": "^25.6.0",
+    "esbuild": "^0.28.0",
     "typescript": "^5.9.3"
   },
   "keywords": [
