@@ -120,22 +120,6 @@ const mockServers = [
 export default function Page() {
   return (
     <>
-      {/* Nav */}
-      <nav className="nav">
-        <div className="container nav-inner">
-          <a href="#top" className="logo">
-            <span className="logo-mark"><span className="logo-bolt">⚡</span></span>
-            <span>MCPBolt</span>
-          </a>
-          <div className="nav-links">
-            <a href="#features">Features</a>
-            <a href="#compat">Works with</a>
-            <a href="#security">Security</a>
-            <a href={GITHUB_URL} className="nav-cta" target="_blank" rel="noreferrer">GitHub</a>
-          </div>
-        </div>
-      </nav>
-
       {/* Hero */}
       <header id="top" className="hero container">
         <div className="tag">
@@ -348,18 +332,6 @@ export default function Page() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer>
-        <div className="container">
-          <div className="foot-links">
-            <a href={GITHUB_URL} target="_blank" rel="noreferrer">GitHub</a>
-            <a href={`${GITHUB_URL}/issues`} target="_blank" rel="noreferrer">Issues</a>
-            <a href={`${GITHUB_URL}/releases`} target="_blank" rel="noreferrer">Releases</a>
-            <a href={`${GITHUB_URL}/blob/main/LICENSE`} target="_blank" rel="noreferrer">License</a>
-          </div>
-          <div>Built by <a href={GITHUB_URL}>@vishmathpati</a> · MIT licensed · macOS 14+</div>
-        </div>
-      </footer>
     </>
   );
 }
