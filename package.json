@@ -14,9 +14,11 @@
   },
   "scripts": {
     "dev": "bun src/cli/index.ts",
-    "build": "npx esbuild src/cli/index.ts --outdir=dist/cli --platform=node --bundle --minify --format=esm",
-    "build:bun": "bun build src/cli/index.ts --outdir dist/cli --target node --minify",
-    "prepublishOnly": "npm run build",
+    "build": "npm --prefix landing install && npm --prefix landing run build",
+    "start": "npm --prefix landing run start",
+    "build:cli": "npx esbuild src/cli/index.ts --outdir=dist/cli --platform=node --bundle --minify --format=esm",
+    "build:cli:bun": "bun build src/cli/index.ts --outdir dist/cli --target node --minify",
+    "prepublishOnly": "npm run build:cli:bun",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
