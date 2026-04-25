@@ -42,6 +42,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <Script src="https://cloud.umami.is/script.js" data-website-id="c65a54c8-4712-42ff-9266-19e08b5c3b07" strategy="afterInteractive" />
         <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
         <Script id="gtag-init" strategy="afterInteractive">{`
           window.dataLayer = window.dataLayer || [];
