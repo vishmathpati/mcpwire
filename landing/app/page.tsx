@@ -74,17 +74,17 @@ const features = [
   },
 ];
 
-const compat = [
-  { name: "Claude Desktop", dot: "#d97757" },
-  { name: "Claude Code",    dot: "#d97757" },
-  { name: "Cursor",         dot: "#7c5cbf" },
-  { name: "Codex CLI",      dot: "#10a37f" },
-  { name: "VS Code",        dot: "#1e88e5" },
-  { name: "Windsurf",       dot: "#009688" },
-  { name: "Zed",            dot: "#084ccf" },
-  { name: "Gemini CLI",     dot: "#4285f4" },
-  { name: "opencode",       dot: "#e8941e" },
-  { name: "Roo",            dot: "#e91e63" },
+const compat: { name: string; bg: string; icon?: string; letter?: string }[] = [
+  { name: "Claude Desktop", bg: "#d97757", icon: "https://cdn.simpleicons.org/anthropic/ffffff" },
+  { name: "Claude Code",    bg: "#d97757", icon: "https://cdn.simpleicons.org/anthropic/ffffff" },
+  { name: "Cursor",         bg: "#7c5cbf", icon: "https://cdn.simpleicons.org/cursor/ffffff" },
+  { name: "Codex CLI",      bg: "#10a37f", icon: "https://cdn.simpleicons.org/openai/ffffff" },
+  { name: "VS Code",        bg: "#1e88e5", icon: "https://cdn.simpleicons.org/visualstudiocode/ffffff" },
+  { name: "Windsurf",       bg: "#009688", icon: "https://cdn.simpleicons.org/codeium/ffffff" },
+  { name: "Zed",            bg: "#084ccf", icon: "https://cdn.simpleicons.org/zed/ffffff" },
+  { name: "Gemini CLI",     bg: "#4285f4", icon: "https://cdn.simpleicons.org/googlegemini/ffffff" },
+  { name: "opencode",       bg: "#e8941e", letter: "oc" },
+  { name: "Roo",            bg: "#e91e63", letter: "R" },
 ];
 
 const security = [
@@ -561,7 +561,12 @@ export default function Page() {
           <div className="compat-row">
             {compat.map((c) => (
               <div key={c.name} className="compat-chip">
-                <span className="compat-dot" style={{ background: c.dot }} />
+                <span className="compat-logo" style={{ background: c.bg }}>
+                  {c.icon
+                    ? <img src={c.icon} width={16} height={16} alt={c.name} style={{ display: "block" }} />
+                    : <span style={{ fontSize: 10, fontWeight: 800, color: "#fff", lineHeight: 1 }}>{c.letter}</span>
+                  }
+                </span>
                 <span>{c.name}</span>
               </div>
             ))}
