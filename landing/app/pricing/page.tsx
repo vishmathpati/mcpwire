@@ -33,7 +33,7 @@ const proFeatures = [
 const teamFeatures = [
   "Everything in Pro",
   "Enterprise SSO integration (SAML / OIDC)",
-  "Centralised server catalog for your org",
+  "Centralized server catalog for your org",
   "All data stays in your infrastructure",
   "Compliance-friendly — no cloud dependency",
   "Custom contract and SLA",
@@ -76,7 +76,7 @@ export default function PricingPage() {
           <span className="accent">Free forever.</span>
         </h1>
         <p className="sub">
-          MCPBolt is free and open source. All features, all tools, no paywalls. Pro and Team tiers are on the roadmap for teams that need infrastructure-level features.
+          MCPBolt is free and open source. Every feature, every tool, no paywalls. Pro and Team plans are on the roadmap for teams that need multi-machine sync and org-level management.
         </p>
       </header>
 
@@ -115,7 +115,7 @@ export default function PricingPage() {
               </h3>
               <div className="price-amount" style={{ color: "var(--fg-faint)" }}>TBD</div>
               <p style={{ color: "var(--fg-dim)", fontSize: "var(--fs-sm)", margin: 0, lineHeight: 1.5 }}>
-                For developers who work across multiple machines and want their server lists in sync without manual effort.
+                For developers who work across multiple machines and want their MCP server list in sync everywhere, automatically.
               </p>
               <ul className="price-features">
                 {proFeatures.map((f) => <li key={f}>{f}</li>)}
@@ -128,9 +128,9 @@ export default function PricingPage() {
                 fontSize: "var(--fs-sm)",
                 color: "var(--fg-faint)",
               }}>
-                Leave your email at{" "}
+                Email{" "}
                 <a href="mailto:hello@mcpbolt.com" style={{ color: "var(--accent)" }}>hello@mcpbolt.com</a>{" "}
-                to get notified
+                to be notified when Pro launches
               </div>
             </div>
 
@@ -149,7 +149,7 @@ export default function PricingPage() {
               </h3>
               <div className="price-amount" style={{ color: "var(--fg-faint)" }}>Custom</div>
               <p style={{ color: "var(--fg-dim)", fontSize: "var(--fs-sm)", margin: 0, lineHeight: 1.5 }}>
-                For engineering teams that want centralised MCP server management with compliance guarantees and no external data dependency.
+                For engineering teams that need centralized MCP server management with compliance guarantees and zero external data dependency.
               </p>
               <ul className="price-features">
                 {teamFeatures.map((f) => <li key={f}>{f}</li>)}

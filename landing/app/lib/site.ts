@@ -1,3 +1,4 @@
+export const SITE_URL = "https://mcpbolt.app";
 export const GITHUB_URL = "https://github.com/vishmathpati/mcpbolt";
 export const DOWNLOAD_URL = `${GITHUB_URL}/releases/latest`;
 export const BREW_CMD = "brew install --cask vishmathpati/mcpbolt/mcpboltbar";

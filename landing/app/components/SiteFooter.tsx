@@ -1,6 +1,5 @@
 import Link from "next/link";
-
-const GITHUB_URL = "https://github.com/vishmathpati/mcpbolt";
+import { GITHUB_URL, SITE_URL } from "../lib/site";
 
 export function SiteFooter() {
   return (
@@ -50,7 +49,10 @@ export function SiteFooter() {
           </div>
         </div>
         <div className="footer-bottom">
-          <div>Built by <a href={GITHUB_URL}>@vishmathpati</a> · MIT licensed · macOS 14+</div>
+          <div>
+            <a href={SITE_URL}>{SITE_URL.replace("https://", "")}</a>
+            {" "}· Built by <a href={GITHUB_URL}>@vishmathpati</a> · MIT licensed · macOS 14+
+          </div>
           <div className="footer-bottom-right">
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>

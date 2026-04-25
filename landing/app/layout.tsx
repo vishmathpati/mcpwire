@@ -4,19 +4,19 @@ import { SiteNav } from "./components/SiteNav";
 import { SiteFooter } from "./components/SiteFooter";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://mcpbolt.com"),
+  metadataBase: new URL("https://mcpbolt.app"),
   title: {
     default: "MCPBolt — One‑click MCP servers for every app",
     template: "%s · MCPBolt",
   },
   description:
-    "A tiny menu bar app that installs, syncs, and manages Model Context Protocol servers across Claude Desktop, Cursor, VS Code, Windsurf, Zed, Codex, Gemini, and more. Local, free, open source.",
+    "A tiny Mac menu bar app that installs, syncs, and manages Model Context Protocol servers across Claude Desktop, Cursor, VS Code, Windsurf, Zed, Codex CLI, Gemini CLI, and more. Local, free, open source.",
   openGraph: {
     title: "MCPBolt — One‑click MCP servers for every app",
     description:
-      "Install, sync and manage MCP servers across every major AI coding tool from one menu bar app. Local, free, open source.",
+      "Install, sync, and manage MCP servers across every major AI coding tool from one menu bar app. Local, free, open source.",
     type: "website",
-    url: "https://mcpbolt.com",
+    url: "https://mcpbolt.app",
     siteName: "MCPBolt",
   },
   twitter: {

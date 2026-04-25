@@ -1,6 +1,5 @@
 import Link from "next/link";
-
-const GITHUB_URL = "https://github.com/vishmathpati/mcpbolt";
+import { GITHUB_URL } from "../lib/site";
 
 export function SiteNav() {
   return (
