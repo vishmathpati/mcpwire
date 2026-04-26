@@ -5,12 +5,14 @@ import AppKit
 
 struct CopyToAppsSheet: View {
     @EnvironmentObject var store: ServerStore
+    @EnvironmentObject var projectStore: ProjectStore
     let serverName: String
     let sourceToolID: String
     let sourceToolLabel: String
     let onClose: () -> Void
 
     @State private var selected: Set<String> = []
+    @State private var selectedProject: Project? = nil
     @State private var running = false
     @State private var resultText: String? = nil
 
@@ -109,11 +111,93 @@ struct CopyToAppsSheet: View {
                         }
                     }
                 }
+
+                Divider().padding(.vertical, 2)
+
+                projectPickerSection
             }
             .padding(14)
         }
         .frame(maxHeight: 400)
     }
+
+    private var projectPickerSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Project (optional)")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+
+            if let project = selectedProject {
+                HStack(spacing: 8) {
+                    Image(systemName: "folder.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(.blue)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(project.displayName)
+                            .font(.system(size: 12, weight: .medium))
+                        let tools = projectStore.detectedToolIDs(for: project)
+                        let toolNames = tools.isEmpty ? ["claude-code"] : tools
+                        Text("→ \(toolNames.joined(separator: ", "))")
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Button(action: { selectedProject = nil }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary.opacity(0.6))
+                            .font(.system(size: 14))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color.blue.opacity(0.07))
+                .clipShape(RoundedRectangle(cornerRadius: 7))
+            } else {
+                Menu {
+                    if !projectStore.projects.isEmpty {
+                        ForEach(projectStore.projects) { project in
+                            Button(project.displayName) {
+                                selectedProject = project
+                            }
+                        }
+                        Divider()
+                    }
+                    Button("Browse for folder…") {
+                        if let path = projectStore.pickFolder() {
+                            selectedProject = projectStore.add(path: path)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 11))
+                        Text("Select project…")
+                            .font(.system(size: 12))
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 9))
+                    }
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(Color.secondary.opacity(0.07))
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                    .contentShape(Rectangle())
+                }
+                .menuStyle(.borderlessButton)
+            }
+        }
+    }
+
+    private var selectionSummary: String {
+        var parts: [String] = []
+        if !selected.isEmpty { parts.append("\(selected.count) app\(selected.count == 1 ? "" : "s")") }
+        if selectedProject != nil { parts.append("1 project") }
+        return parts.isEmpty ? "0 selected" : parts.joined(separator: " + ")
+    }
+
+    private var hasSelection: Bool { !selected.isEmpty || selectedProject != nil }
 
     private var footer: some View {
         HStack {
@@ -122,7 +206,7 @@ struct CopyToAppsSheet: View {
             }
             .buttonStyle(.plain)
             Spacer()
-            Text("\(selected.count) selected")
+            Text(selectionSummary)
                 .font(.system(size: 11)).foregroundColor(.secondary)
             Button(action: run) {
                 HStack(spacing: 5) {
@@ -135,10 +219,10 @@ struct CopyToAppsSheet: View {
                 .padding(.vertical, 7)
                 .background(ContentView.headerGrad)
                 .clipShape(RoundedRectangle(cornerRadius: 7))
-                .opacity(selected.isEmpty ? 0.4 : 1)
+                .opacity(hasSelection ? 1 : 0.4)
             }
             .buttonStyle(.plain)
-            .disabled(selected.isEmpty || running)
+            .disabled(!hasSelection || running)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
@@ -172,20 +256,39 @@ struct CopyToAppsSheet: View {
 
     private func run() {
         running = true
-        let outcome = store.copyServer(
-            name: serverName,
-            from: sourceToolID,
-            to: Array(selected)
-        )
+        var totalOk = 0
+        var totalFail = 0
+
+        if !selected.isEmpty {
+            let outcome = store.copyServer(name: serverName, from: sourceToolID, to: Array(selected))
+            totalOk   += outcome.successes.count
+            totalFail += outcome.failures.count
+        }
+
+        if let project = selectedProject,
+           let config = ConfigWriter.readServer(toolID: sourceToolID, name: serverName) {
+            let existing = projectStore.detectedToolIDs(for: project)
+            let toolsToWrite = existing.isEmpty ? ["claude-code"] : existing
+            for toolID in toolsToWrite {
+                guard ToolSpecs.projectScopedTools.contains(toolID) else { continue }
+                do {
+                    try ConfigWriter.writeServer(
+                        toolID: toolID, scope: .project,
+                        projectRoot: project.path, name: serverName, config: config)
+                    totalOk += 1
+                } catch {
+                    totalFail += 1
+                }
+            }
+        }
+
         running = false
-        let ok = outcome.successes.count
-        let fail = outcome.failures.count
-        if fail == 0 {
-            resultText = "Copied to \(ok) app\(ok == 1 ? "" : "s")."
-        } else if ok == 0 {
-            resultText = "Couldn't copy: \(outcome.failures.first?.message ?? "unknown error")"
+        if totalFail == 0 {
+            resultText = "Copied to \(totalOk) destination\(totalOk == 1 ? "" : "s")."
+        } else if totalOk == 0 {
+            resultText = "Couldn't copy: check tool configs and try again."
         } else {
-            resultText = "Copied to \(ok) app\(ok == 1 ? "" : "s"); \(fail) failed."
+            resultText = "Copied to \(totalOk) destination\(totalOk == 1 ? "" : "s"); \(totalFail) failed."
         }
     }
 }
