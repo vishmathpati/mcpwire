@@ -63,62 +63,66 @@ struct CopyToAppsSheet: View {
     }
 
     private var pickerView: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                if candidateTools.isEmpty {
-                    Text("No other detected apps to copy to.")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                        .padding()
-                } else {
-                    Text("Pick the apps to copy this server into.")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    if candidateTools.isEmpty {
+                        Text("No other detected apps to copy to.")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondary)
+                            .padding()
+                    } else {
+                        Text("Pick the apps to copy this server into.")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
 
-                    VStack(spacing: 4) {
-                        ForEach(candidateTools) { tool in
-                            let c = ToolPalette.color(for: tool.toolID)
-                            let already = tool.servers.contains(where: { $0.name == serverName })
-                            Button(action: { toggle(tool.toolID) }) {
-                                HStack(spacing: 10) {
-                                    ZStack {
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .fill(c.opacity(0.14))
-                                            .frame(width: 26, height: 26)
-                                        Image(systemName: ToolPalette.icon(for: tool.toolID))
-                                            .font(.system(size: 11, weight: .semibold))
-                                            .foregroundColor(c)
+                        VStack(spacing: 4) {
+                            ForEach(candidateTools) { tool in
+                                let c = ToolPalette.color(for: tool.toolID)
+                                let already = tool.servers.contains(where: { $0.name == serverName })
+                                Button(action: { toggle(tool.toolID) }) {
+                                    HStack(spacing: 10) {
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .fill(c.opacity(0.14))
+                                                .frame(width: 26, height: 26)
+                                            Image(systemName: ToolPalette.icon(for: tool.toolID))
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundColor(c)
+                                        }
+                                        Text(tool.label)
+                                            .font(.system(size: 12, weight: .medium))
+                                        if already {
+                                            Text("— already installed, will overwrite")
+                                                .font(.system(size: 10))
+                                                .foregroundColor(.orange)
+                                        }
+                                        Spacer()
+                                        Image(systemName: selected.contains(tool.toolID)
+                                              ? "checkmark.square.fill" : "square")
+                                            .foregroundColor(selected.contains(tool.toolID) ? c : .secondary.opacity(0.5))
                                     }
-                                    Text(tool.label)
-                                        .font(.system(size: 12, weight: .medium))
-                                    if already {
-                                        Text("— already installed, will overwrite")
-                                            .font(.system(size: 10))
-                                            .foregroundColor(.orange)
-                                    }
-                                    Spacer()
-                                    Image(systemName: selected.contains(tool.toolID)
-                                          ? "checkmark.square.fill" : "square")
-                                        .foregroundColor(selected.contains(tool.toolID) ? c : .secondary.opacity(0.5))
+                                    .contentShape(Rectangle())
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 7)
+                                    .background(selected.contains(tool.toolID) ? c.opacity(0.08) : Color.clear)
+                                    .clipShape(RoundedRectangle(cornerRadius: 7))
                                 }
-                                .contentShape(Rectangle())
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 7)
-                                .background(selected.contains(tool.toolID) ? c.opacity(0.08) : Color.clear)
-                                .clipShape(RoundedRectangle(cornerRadius: 7))
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                 }
-
-                Divider().padding(.vertical, 2)
-
-                projectPickerSection
+                .padding(14)
             }
-            .padding(14)
+            .frame(maxHeight: 300)
+
+            Divider()
+
+            projectPickerSection
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
         }
-        .frame(maxHeight: 400)
     }
 
     private var projectPickerSection: some View {
