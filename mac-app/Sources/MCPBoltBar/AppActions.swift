@@ -229,9 +229,17 @@ enum AppActions {
         let url = FileManager.default.fileExists(atPath: appURL.path)
             ? appURL
             : URL(fileURLWithPath: Bundle.main.bundlePath)
-        let cfg = NSWorkspace.OpenConfiguration()
-        cfg.activates = true
-        NSWorkspace.shared.openApplication(at: url, configuration: cfg) { _, _ in
+
+        // Use /usr/bin/open in a detached process — it outlives our process and
+        // reliably launches the new binary after we quit. NSWorkspace callbacks
+        // run on a background thread and terminate() from there is unreliable.
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+        proc.arguments = [url.path]
+        try? proc.run()
+
+        // Short delay so 'open' can register before we exit.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
             NSApp.terminate(nil)
         }
     }
