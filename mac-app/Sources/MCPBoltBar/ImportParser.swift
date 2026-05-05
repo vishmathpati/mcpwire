@@ -27,15 +27,17 @@ enum ImportParseError: Error, LocalizedError {
     case noServersFound
     case noCommandOrUrl
     case wizardCommand
+    case authCommand
 
     var errorDescription: String? {
         switch self {
         case .emptyInput:       return "Paste an MCP server config to get started."
-        case .notJson:          return "Doesn't look like JSON or a \"mcp add\" CLI command. Check for a missing brace, trailing comma, or a typo."
+        case .notJson:          return "Doesn't look like JSON, an npx command, or a \"mcp add\" CLI command. Check for a missing brace or trailing comma."
         case .notAnObject:      return "Expected a JSON object (starting with {)."
         case .noServersFound:   return "Couldn't find any servers in that config."
         case .noCommandOrUrl:   return "Server is missing both \"command\" and \"url\"."
         case .wizardCommand:    return "This is a wizard installer — run it in your terminal and it will write the config directly. Then hit Refresh in MCPBolt to see the new server."
+        case .authCommand:      return "This is an authentication command — handled by your AI tool at runtime. Add the server config first, then authenticate when prompted."
         }
     }
 }
@@ -48,6 +50,13 @@ enum ImportParser {
 
         // Path 1: CLI-style `claude mcp add ...` / `cursor mcp add ...` / `codex mcp add ...` etc.
         // Detect before JSON so a line that starts with `claude mcp add` never gets treated as text.
+
+        // Auth/login subcommands (`opencode mcp auth`, `codex mcp login`) are runtime operations,
+        // not config writes. Return a targeted message instead of the generic JSON error.
+        if isAuthCommand(trimmed) {
+            return .failure(.authCommand)
+        }
+
         if let cliServer = parseCliAdd(trimmed) {
             return .success([cliServer])
         }
@@ -57,6 +66,12 @@ enum ImportParser {
         // into a server config. Return a specific, helpful error instead of the generic one.
         if isWizardCommand(trimmed) {
             return .failure(.wizardCommand)
+        }
+
+        // Path 1c: bare npx / bunx command — the form commonly shown on MCP server homepages.
+        // e.g. `npx @playwright/mcp@latest` or `npx -y @company/server --port 3000`
+        if let npxServer = parseNpxCommand(trimmed) {
+            return .success([npxServer])
         }
 
         // Path 2: JSON. Strip JSONC comments first so Claude Desktop–style pastes work.
@@ -105,11 +120,14 @@ enum ImportParser {
 
     // MARK: - CLI command parser
     //
-    // Parses `<tool> mcp add <name> [flags] <command | url> [args...]` where
-    // <tool> is one of claude / cursor / codex / windsurf / gemini / zed (or omitted).
+    // Parses `<tool> mcp add [flags] <name> [flags] <command | url> [args...]` where
+    // <tool> is one of claude / cursor / codex / windsurf / gemini / zed / opencode (or omitted).
+    // Flags may appear before or after the server name — all are collected in one pass.
     //
     // Examples:
-    //   claude mcp add context7 --transport http https://mcp.context7.com/mcp
+    //   claude mcp add --scope project --transport http supabase https://mcp.supabase.com/mcp
+    //   codex mcp add supabase --url https://mcp.supabase.com/mcp
+    //   gemini mcp add -t http supabase https://mcp.supabase.com/mcp
     //   cursor mcp add filesystem --transport stdio npx -y @mcp/server-filesystem /tmp
     //   codex mcp add mytool -e API_KEY=abc npx -y my-mcp-server
     //   mcp add foo --transport sse https://example.com/sse -H Authorization=Bearer\ X
@@ -121,7 +139,7 @@ enum ImportParser {
         if tokens.isEmpty { return nil }
 
         var i = 0
-        let toolPrefixes: Set<String> = ["claude", "cursor", "codex", "windsurf", "gemini", "zed"]
+        let toolPrefixes: Set<String> = ["claude", "cursor", "codex", "windsurf", "gemini", "zed", "opencode"]
         if i < tokens.count, toolPrefixes.contains(tokens[i].lowercased()) { i += 1 }
 
         guard i < tokens.count, tokens[i].lowercased() == "mcp" else { return nil }
@@ -129,14 +147,14 @@ enum ImportParser {
         guard i < tokens.count, tokens[i].lowercased() == "add" else { return nil }
         i += 1
 
-        guard i < tokens.count else { return nil }
-        let name = tokens[i]
-        if name.hasPrefix("-") { return nil }
-        i += 1
-
+        // Single-pass: collect flags anywhere, name = first non-flag positional,
+        // rest = everything from the second positional onward (command + its args).
         var transport = "stdio"
         var env: [String: String] = [:]
         var headers: [String: String] = [:]
+        var urlFlag: String? = nil
+        var name: String? = nil
+        var rest: [String] = []
 
         while i < tokens.count {
             let tok = tokens[i]
@@ -148,61 +166,64 @@ enum ImportParser {
                     transport = (val == "http" || val == "sse" || val == "stdio") ? val : "stdio"
                     i += 1
                 }
-                continue
-            }
-
-            if tok == "--env" || tok == "-e" {
+            } else if tok == "--scope" || tok == "-s" {
+                // mcpbolt has its own scope UI — skip the value but don't fail
+                i += 1
+                if i < tokens.count && !tokens[i].hasPrefix("-") { i += 1 }
+            } else if tok == "--env" || tok == "-e" {
                 i += 1
                 if i < tokens.count {
-                    let kv = tokens[i]
+                    let kv = tokens[i]; i += 1
                     if let eq = kv.firstIndex(of: "="), eq > kv.startIndex {
-                        let k = String(kv[..<eq])
-                        let v = String(kv[kv.index(after: eq)...])
-                        env[k] = v
+                        env[String(kv[..<eq])] = String(kv[kv.index(after: eq)...])
                     }
-                    i += 1
                 }
-                continue
-            }
-
-            if tok == "--header" || tok == "-H" {
+            } else if tok == "--header" || tok == "-H" {
                 i += 1
                 if i < tokens.count {
-                    let kv = tokens[i]
+                    let kv = tokens[i]; i += 1
                     if let eq = kv.firstIndex(of: "="), eq > kv.startIndex {
-                        let k = String(kv[..<eq])
-                        let v = String(kv[kv.index(after: eq)...])
-                        headers[k] = v
+                        headers[String(kv[..<eq])] = String(kv[kv.index(after: eq)...])
                     }
-                    i += 1
                 }
-                continue
+            } else if tok == "--url" {
+                i += 1
+                if i < tokens.count { urlFlag = tokens[i]; i += 1 }
+            } else if tok.hasPrefix("-") {
+                // Unknown flag — skip it and its value (if value doesn't start with -)
+                i += 1
+                if i < tokens.count && !tokens[i].hasPrefix("-") { i += 1 }
+            } else if name == nil {
+                // First non-flag token = server name
+                name = tok; i += 1
+            } else {
+                // Second non-flag token onwards = command + its args (stop flag scanning)
+                rest = Array(tokens[i...])
+                break
             }
-
-            // Unknown flag + its value → skip both
-            if tok.hasPrefix("--") { i += 2; continue }
-            if tok.hasPrefix("-") && tok.count == 2 { i += 2; continue }
-
-            break // reached the command / url
         }
 
-        let rest = Array(tokens[i...])
-        if rest.isEmpty { return nil }
+        guard let serverName = name else { return nil }
 
         var config: [String: Any] = [:]
 
-        if transport == "http" || transport == "sse" {
-            config["url"] = rest[0]
+        let isRemote = transport == "http" || transport == "sse" || urlFlag != nil
+        if isRemote {
+            // Prefer explicit --url; fall back to first positional after name
+            guard let url = urlFlag ?? rest.first else { return nil }
+            config["url"] = url
+            config["type"] = (transport == "sse") ? "sse" : "http"
             if !headers.isEmpty { config["headers"] = headers }
-            config["type"] = transport  // remote servers want an explicit type
-        } else {
+        } else if !rest.isEmpty {
             config["command"] = rest[0]
             if rest.count > 1 { config["args"] = Array(rest.dropFirst()) }
+        } else {
+            return nil  // stdio with no command
         }
 
         if !env.isEmpty { config["env"] = env }
 
-        return ParsedServer(name: name, config: config)
+        return ParsedServer(name: serverName, config: config)
     }
 
     /// Minimal shell tokenizer — handles single / double quoted strings and
@@ -237,6 +258,69 @@ enum ImportParser {
         }
         if !current.isEmpty { tokens.append(current) }
         return tokens
+    }
+
+    // MARK: - NPX / bunx command parser
+    //
+    // Parses `npx <pkg> [args...]` or `bunx <pkg> [args...]` into a stdio server config.
+    // The server name is derived from the package identifier.
+    //
+    // Examples:
+    //   npx @playwright/mcp@latest
+    //   npx -y @company/mcp-server --port 3000
+    //   bunx @anthropic/mcp-server-brave-search
+    static func parseNpxCommand(_ input: String) -> ParsedServer? {
+        let tokens = shellSplit(input)
+        guard !tokens.isEmpty else { return nil }
+        let runner = tokens[0].lowercased()
+        guard runner == "npx" || runner == "bunx" else { return nil }
+
+        let args = Array(tokens.dropFirst())
+        guard !args.isEmpty else { return nil }
+
+        let packageArg = args.first(where: { !$0.hasPrefix("-") }) ?? args[0]
+        let name = nameFromPackage(packageArg)
+
+        let config: [String: Any] = ["command": tokens[0], "args": args]
+        return ParsedServer(name: name, config: config)
+    }
+
+    // Derives a clean server name from a package identifier.
+    // @playwright/mcp@latest → playwright-mcp
+    // @company/server-brave-search → server-brave-search (via cleanName)
+    // mcp-server-filesystem → mcp-server-filesystem
+    private static func nameFromPackage(_ pkg: String) -> String {
+        var p = pkg
+        if p.hasPrefix("@") {
+            // Scoped: @scope/name@version — strip version from the name part only
+            let rest = p.dropFirst()
+            if let slashIdx = rest.firstIndex(of: "/") {
+                let namePart = rest[rest.index(after: slashIdx)...]
+                if let vIdx = namePart.firstIndex(of: "@") {
+                    p = String(p[..<vIdx])  // drop "@latest" suffix, keep "@scope/name"
+                }
+            }
+        } else {
+            // Unscoped: name@version → name
+            if let vIdx = p.firstIndex(of: "@") {
+                p = String(p[..<vIdx])
+            }
+        }
+        return cleanName(p)
+    }
+
+    // Returns true for `<tool> mcp auth|login|logout <name>` — runtime auth, not a config write.
+    private static func isAuthCommand(_ input: String) -> Bool {
+        let tokens = shellSplit(input)
+        guard tokens.count >= 3 else { return false }
+        var i = 0
+        let toolPrefixes: Set<String> = ["claude", "cursor", "codex", "windsurf", "gemini", "zed", "opencode"]
+        if toolPrefixes.contains(tokens[i].lowercased()) { i += 1 }
+        guard i < tokens.count, tokens[i].lowercased() == "mcp" else { return false }
+        i += 1
+        guard i < tokens.count else { return false }
+        let sub = tokens[i].lowercased()
+        return sub == "auth" || sub == "login" || sub == "logout"
     }
 
     // Returns true for `npx <pkg> mcp add [...]` / `bunx <pkg> mcp add [...]` patterns.
