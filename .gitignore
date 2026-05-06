@@ -48,3 +48,8 @@ CLAUDE.md
 
 # private roadmap / strategy notes — never commit
 ROADMAP.private.md
+
+# landing site — exclude build artifacts and deps
+landing/node_modules
+landing/.next
+landing/package-lock.json
