@@ -2,7 +2,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { onPath, dirExists } from '../core/detect.ts'
 import { mergeToml, removeToml } from '../core/merger.ts'
-import { readTomlServers } from '../core/reader.ts'
+import { readTomlServers, readCodexPlugins } from '../core/reader.ts'
 import type { IR } from '../core/ir.ts'
 import type { Target, Scope } from './_base.ts'
 import { irToCodexShape } from './_base.ts'
@@ -33,7 +33,16 @@ export const codex: Target = {
     return mergeToml(filePath, 'mcp_servers', ir.name, this.toNative(ir), dryRun)
   },
 
-  readServers(scope: Scope) { return readTomlServers(this.configPath(scope)) },
+  readServers(scope: Scope) {
+    const filePath = this.configPath(scope)
+    const manual = readTomlServers(filePath)
+    if (scope !== 'user') return manual
+    // For user scope, also include MCPs bundled in active plugins
+    const plugins = readCodexPlugins(filePath)
+    const seen = new Set(manual.map(s => s.name))
+    const newPlugins = plugins.filter(s => !seen.has(s.name))
+    return [...manual, ...newPlugins]
+  },
 
   remove(scope: Scope, name: string, dryRun: boolean) {
     return removeToml(this.configPath(scope), 'mcp_servers', name, dryRun)

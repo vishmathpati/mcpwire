@@ -10,6 +10,12 @@ struct ServerEntry: Identifiable, Hashable {
     let args: [String]
     let url: String?
     var isDisabled: Bool = false
+    // Provenance
+    var source: String = "manual"   // "manual" | "extension" | "plugin"
+    var readonly: Bool = false      // true = installed by the app; mcpbolt can't remove it
+    // Auth
+    var needsAuth: Bool = false
+    var oauthNote: String? = nil
 
     var detail: String {
         if transport == "stdio" {

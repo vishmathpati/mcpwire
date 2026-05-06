@@ -293,25 +293,40 @@ struct ServerRow: View {
     private let healthTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     private var kindLabel: String {
-        switch server.transport {
-        case "http", "sse": return "Remote"
-        default:            return "Local"
+        switch server.source {
+        case "extension": return "Extension"
+        case "plugin":    return "Plugin"
+        default:
+            switch server.transport {
+            case "http", "sse": return "Remote"
+            default:            return "Local"
+            }
         }
     }
 
     private var kindIcon: String {
-        switch server.transport {
-        case "http", "sse": return "globe"
-        default:            return "desktopcomputer"
+        switch server.source {
+        case "extension": return "puzzlepiece.extension"
+        case "plugin":    return "square.stack"
+        default:
+            switch server.transport {
+            case "http", "sse": return "globe"
+            default:            return "desktopcomputer"
+            }
         }
     }
 
     private var kindColor: Color {
-        server.transport == "stdio" ? Color.secondary : accent
+        switch server.source {
+        case "extension", "plugin": return .purple
+        default:
+            return server.transport == "stdio" ? Color.secondary : accent
+        }
     }
 
+    // readonly entries (DXT extensions, plugins) can't be removed via mcpbolt
     private var nativeSupported: Bool {
-        ConfigWriter.supportsNativeWrite(toolID: toolID)
+        !server.readonly && ConfigWriter.supportsNativeWrite(toolID: toolID)
     }
 
     private var hostCount: Int {
@@ -331,6 +346,13 @@ struct ServerRow: View {
                 .foregroundColor(server.isDisabled ? .secondary : .primary)
                 .lineLimit(1)
                 .strikethrough(server.isDisabled, color: .secondary)
+
+            if server.needsAuth {
+                Image(systemName: "key.fill")
+                    .font(.system(size: 9))
+                    .foregroundColor(.orange.opacity(0.8))
+                    .help(server.oauthNote ?? "Requires authentication or credentials")
+            }
 
             HStack(spacing: 3) {
                 Image(systemName: kindIcon)
